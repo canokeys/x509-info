@@ -116,35 +116,33 @@ Certificate parsing requires exactly one nonempty 70 field, accepts absent 71 as
 
 Planned SignInput distinguishes RSA encoded block (host owns hash/PKCS1/PSS), ECDSA digest (order-bit truncation and short-value padding), Ed25519 message, SM2 digest (host computes SM3(ZA||M)), and ML-DSA message/context. Unverified contexts are rejected before sending. RSA decrypt returns the modulus-sized raw block; unpadding stays in the application. ECDH/X25519 derive validates peer encoding and returns raw shared secret; no KDF. ML-KEM decapsulation is separate with checked ciphertext/secret lengths. Algorithm names are semantic identifiers, not reconfigurable wire IDs or support promises.
 
-File I/O, private-key PEM/PKCS#8 import, CSR/X.509 policy, PKCS#11 padding/KDF and object records stay outside the library. Generic certificate DER/PEM inspection is now an optional pure module, described below. Enable directories, retry configuration, move/delete key, algorithm writes and new algorithms individually by evidence.
+File I/O, private-key PEM/PKCS#8 import, CSR/X.509 policy, PKCS#11 padding/KDF and object records stay outside the library. Generic certificate DER/PEM inspection is an optional pure module, described below. Enable directories, retry configuration, move/delete key, algorithm writes and new algorithms individually by evidence.
 
 ## Generic certificate inspection
 
-`x509-info` is independent of PIV/protocol and re-exported as `canokey::x509` under the `x509` feature. It adapts Console's Rust DER/PEM extraction using the same `x509-parser` dependency plus strict `pem-rfc7468` decoding, without FRB, logging, clocks, randomness or device state. The PIV certificate operation still unwraps its applet container; inspection is a separate synchronous pure function. Other applets/applications can use it directly.
+`x509-info` is independent of applets and optionally re-exported as `canokey::x509`.
+PIV unwraps the certificate container; inspection is a separate pure function with
+no operation handle, transport, clock, or application state.
 
-`parse_der(bytes, ParseOptions)` and `parse_pem(bytes, ParseOptions)` return an owned `CertificateInfo`. Input is borrowed only for the call; the default encoded-input budget is 1 MiB, checked before parsing/base64 decoding. Exactly one certificate is accepted; PEM permits surrounding ASCII whitespace but no bundles or extra text. DER trailing bytes and inconsistent inner/outer signature algorithm identifiers fail. Errors are typed local parsing failures, not fabricated card status errors.
-
-| Result | Representation |
-| --- | --- |
-| Subject/issuer | Presentation text, ordered RDN/attribute groups and exact Name DER |
-| Validity | Signed Unix-second bounds; `contains(timestamp)` takes an explicit caller timestamp |
-| Serial/signature | Original serial INTEGER bytes and signature BIT STRING bytes/unused-bit count; signature algorithm OID, label and decoded RSA-PSS parameters |
-| Public key | Algorithm/curve OIDs, complete SPKI DER, raw key bytes, optional algorithm-specific size, key/parameter inspection status, separate encoded bit count |
-| Extensions | OID, critical/duplicate flags, raw inner bytes and decoded identities, usage, constraints, identifiers, access locations, CRL points and policies in certificate order |
-
-Unknown key algorithms remain inspectable without inventing their size. This differs from Console's old fallback of encoded bytes times eight. Known EC size comes from its named curve (so P-521 remains 521, not 528); RSA size excludes INTEGER sign padding. Inspection does not validate EC points, verify signatures, process critical-extension policy, build chains or establish trust. Raw DER is retained for richer application processing.
-
-`summary()` produces a separate owned `CertificateSummary` with SHA-256, application fields and no full DER/key/signature/extension copies. Optional Serde exposes schema version 1: lowercase hex byte strings, Unix seconds, dotted OIDs, null optional values and tagged extension/name choices. Full-result Serde retains numeric byte arrays for diagnostics. The detailed representation and supported algorithms are maintained in the [package README](../crates/x509-info/README.md). Result structs/enums are non-exhaustive where expansion is expected.
-
-Supported extension decoding failures are `Malformed`; unhandled OIDs are `Unsupported`. All occurrences of a repeated extension OID are marked `duplicate`; no occurrence is silently selected. These findings do not enforce RFC 5280 policy. Key encoding and algorithm parameter status are separate; unknown algorithms do not become malformed key errors. RSA-PSS is decoded by `pkcs1` within its documented salt/trailer representation, with raw parameters preserved on failure. Fingerprints use `sha2`, not local cryptography.
-
-OID names come from a caller-owned `OidNames` table backed by `oid-registry`, with selected application labels. `parse_der_with_names`/`parse_pem_with_names` borrow it only during the call and copy result labels. Overrides never select decoders or change key sizes. Default entry points create a local default table; no global registry is introduced. The table holds the upstream registry directly, with static built-in labels and a caller-owned override map. Clones share only the immutable base registry; overriding one clone does not change another. Precedence is caller overrides, built-in labels, then upstream short names. DN `display` retains backend formatting and its immutable default lookup table independently of these overrides. Registry coverage and supported key encodings are documented in the package README.
-
-AKI/AIA/SIA use complete-schema checks to prevent ignored nested content; CRL distribution points and policies use RustCrypto `x509-cert` structures. The two format libraries serve different inspection/strict-decoding responsibilities. Backend `GeneralName` decoding feeds one owned projection; RustCrypto names are encoded and passed through that same projection to avoid a second set of string/IP conversion rules. Full and relative CRL names, reasons and issuers remain explicit; no URL is fetched. Policies retain qualifier DER and decode CPS URIs, leaving UserNotice/private values unparsed. Summary schema 1 permits these additive enum variants.
-
-Serde remains format-neutral. CBOR can serialize the summary directly; TOML/custom layouts use caller-owned DTOs. Serializer crates are dev-dependencies only. No certificate-result Deserialize or cross-format round-trip guarantee is added.
-
-FRB uses explicit application DTO mapping and does not require JSON. There is no new operation, result handle, cache or global state. macOS certificate eligibility, CSR/self-signed issuance policy, mixed private-key import, and QR/image decoding stay in Console.
+- DER/PEM parsers borrow input only during the call and return owned results/errors.
+  They accept exactly one bounded certificate and reject trailing data or mismatched
+  inner/outer signature identifiers.
+- The full result retains original encodings. The independent summary omits large
+  certificate/key/signature/extension copies while retaining opaque name and policy
+  values. See the [package contract](../crates/x509-info/README.md#summary-contract)
+  for fields, byte/time encodings, Serde tags, and expansion rules.
+- Unhandled extensions and failed supported decoding remain distinct. Every duplicate
+  extension occurrence is flagged; no occurrence silently wins. Names preserve
+  decoded values or opaque content through dedicated variants. Inspection findings
+  do not establish trust, identity, signature validity, or mathematical key validity.
+- Caller-owned OID overrides affect presentation only. Clones share an immutable
+  upstream base and retain independent overrides. Results copy labels; DN display
+  uses the backend's immutable default table independently of caller overrides.
+- Backend GeneralName decoding feeds one owned projection. RustCrypto strict
+  AKI/AIA/SIA checks and CRL/policy decoding retain their regression-tested behavior.
+  OID-specific opaque values are not automatically interpreted or validated.
+- Serde is optional; serializers and DTO layouts belong to callers. FRB maps owned
+  fields directly without a JSON round trip. No result Deserialize contract exists.
 
 ## Planned Batch
 

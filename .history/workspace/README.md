@@ -134,20 +134,20 @@ python3 scripts/check-dependencies.py
 bash scripts/test-c-abi.sh
 ```
 
-Local validation covers protocol and certificate-inspection tests plus executable rustdoc examples, including malformed input, resource limits, gzip corruption/expansion, ownership, and deterministic parser fuzz smoke; Linux C/C++ checks, examples, wasm, and dependency boundaries also pass. CI additionally targets macOS and Windows; local checks do not establish remote CI or hardware results.
-
-External dependencies are intentional: `zeroize` protects buffers, `flate2` handles gzip, and `thiserror` derives typed error implementations. Optional X.509 inspection uses `x509-parser` with verification/default features disabled and `pem-rfc7468` for strict PEM decoding; optional `serde` derives result serialization. `serde_json` is used by examples/tests, not as a core runtime dependency. `anyhow` remains an application choice because public errors need matchable variants/fields. No platform transport or async runtime is included. Cargo.lock is tracked; `references/`, build outputs, and caches are ignored.
+CI covers native tests, examples, rustdoc, C/C++ linking, wasm, and dependency
+boundaries. Offline fixtures do not establish hardware compatibility. Cargo.lock
+is tracked; reference clones, build outputs, and caches are ignored.
 
 ## Documentation
 
 - [Plan](plan.md): milestones, remaining scope, acceptance.
 - [API design](docs/api-design.md): ownership and protocol contracts, including explicitly marked future APIs.
 - [Reference sources](docs/references.md): pinned upstream evidence.
-- [X.509 ecosystem research](docs/research/x509-ecosystem.md): alternatives, generic package positioning, and publication options.
+- [X.509 ecosystem research](docs/research/x509-ecosystem.md): alternatives and dependency reuse decisions.
 - [Contributor instructions](AGENTS.md): English repository language, architecture, checks, and commits.
 
 ## License
 
 Copyright 2026 canokeys.org.
 
-Licensed under the [Apache License, Version 2.0](LICENSE). The root license applies to all original workspace crates, examples, and documentation. Each crate inherits the SPDX identifier, authors, and homepage from workspace metadata. Every crate contains a regular-file copy of the canonical root LICENSE so Cargo packages include the license on all platforms; CI checks that the copies stay identical. The redundant license-file metadata is intentionally omitted. Third-party dependencies and read-only reference repositories retain their own licenses. Adapted Console certificate-extraction code retains its [upstream MIT notice](crates/x509-info/LICENSE.console).
+Licensed under the [Apache License, Version 2.0](LICENSE). The root license applies to all original workspace crates, examples, and documentation. Each crate inherits the SPDX identifier, authors, and homepage from workspace metadata. Every crate contains a regular-file copy of the canonical root LICENSE so Cargo packages include the license on all platforms; CI checks that the copies stay identical. Third-party dependencies and read-only reference repositories retain their own licenses. Adapted Console certificate-extraction code retains its [upstream MIT notice](crates/x509-info/LICENSE.console).
