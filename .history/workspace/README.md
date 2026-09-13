@@ -12,7 +12,8 @@ Most Rust applications should depend on **`canokey`**. C applications link **`ca
 | `canokey-compat` | Immutable device profiles, capability evidence, firmware rules and algorithm IDs | protocol |
 | `canokey-admin` | Minimal read-only Admin bootstrap command builders | protocol |
 | `canokey-piv` | PIV operations and certificate container parsing | protocol, compat |
-| `canokey` | Application-facing facade: re-exports lower layers and orchestrates device probing | protocol, compat, admin, piv |
+| `canokey` | Application-facing facade: re-exports lower layers and orchestrates device probing | protocol, compat, admin, piv; optional x509 |
+| `canokey-x509` | Bounded DER/PEM inspection into owned certificate structures; optional Serde serialization | None |
 | `canokey-c` | C ABI: converts descriptors, dispatches operations, copies results | canokey |
 
 Dependency arrows point from consumer to dependency:
@@ -24,13 +25,14 @@ graph TD
     F --> P[canokey-piv]
     F --> K[canokey-compat]
     F --> R[canokey-protocol]
+    F -. optional x509 feature .-> X[canokey-x509]
     P --> K
     P --> R
     K --> R
     A --> R
 ```
 
-`protocol` knows nothing about firmware or applets. `compat` never calls an applet; putting probe orchestration in the facade avoids a dependency cycle. `admin` currently contains only bootstrap builders, so it does not yet need compat. Bindings adapt ownership and types without duplicating protocol state. There is no transport crate or mutable global state.
+`protocol` knows nothing about firmware or applets. `compat` never calls an applet; putting probe orchestration in the facade avoids a dependency cycle. `admin` currently contains only bootstrap builders, so it does not yet need compat. Bindings adapt ownership and types without duplicating protocol state. There is no transport crate or mutable global state. `canokey-x509` is independent of applets: PIV removes its certificate container, then an application can inspect the DER through this optional crate. Default facade/C builds do not include X.509 parsing.
 
 ## Implemented scope
 
@@ -38,6 +40,7 @@ graph TD
 - Firmware/PIV version separation, capability evidence, conservative unknown-version handling, observed algorithm IDs, and narrow legacy object quirks.
 - Minimal/PIV read-only probe; PIV SELECT, PIN status/verify/logout, PIN/PUK changes, PIN unblock, object reads with optional PIN, and certificate reads.
 - Certificate container parsing and bounded gzip decompression. `Certificate::der()` returns the payload; X.509 syntax, signatures, and trust validation remain application responsibilities.
+- Optional generic X.509 DER/PEM inspection into owned fields, with timestamp values, raw encodings, and optional Serde serialization. Adapted from Console Rust without its FRB/UI dependencies; no trust verification.
 - Experimental C ABI 0.1: probe, PIN verification/status, public object/certificate reads, typed errors, and copy getters. Only profile/operation handles; see [header](crates/canokey-c/include/canokey.h).
 
 Management-key authentication, writes, metadata, key generation/import/sign/decrypt/derive, Batch, full Admin, OATH, OpenPGP, and Python/FRB bindings are **not implemented**. No consumer repository has been integrated. Compatibility is based on host sources and offline transcripts, not hardware/usbip validation.
@@ -64,9 +67,37 @@ These examples run **offline** and compare every emitted command against a deter
 
 For real hardware, hold one exclusive connection lease across the entire operation. Send `command()` bytes and supply response data **including SW1/SW2** to `advance()`. Disable transport continuation/retries. Getters never send APDUs. An application I/O error drops/closes the operation; drain or isolate outstanding I/O before reusing the connection. See the [Console](docs/console-integration.md) and [PKCS#11](docs/pkcs11-integration.md) boundary examples.
 
+## Certificate structures and JSON
+
+The optional parser is usable directly as `canokey-x509`, or through the facade:
+
+```toml
+[dependencies]
+canokey = { path = "path/to/libcanokey/crates/canokey", features = ["x509"] }
+# Choose features = ["serde"] instead when the application needs serialization.
+```
+
+```rust,ignore
+let certificate = execute(card, canokey::piv::read_certificate(
+    &profile, slot, canokey::piv::Access::None, options)?)?;
+let info = canokey::x509::parse_der(certificate.der(), Default::default())?;
+// info owns subject/issuer, validity, serial, signature, SPKI and extension data.
+// With the serde feature and an application dependency on serde_json:
+let json = serde_json::to_string(&info)?;
+```
+
+Run a complete example using the bundled synthetic certificate or your own PEM/DER file:
+
+```sh
+cargo run -p canokey --features serde --example inspect_certificate --locked
+cargo run -p canokey --features serde --example inspect_certificate --locked -- certificate.pem
+```
+
+The struct is the primary result. FRB wrappers can map it to Dart DTOs directly; JSON is optional and uses octet arrays for bytes, Unix seconds for times, and null for an unknown algorithm-specific key size. The encoded key-bit count is a separate field. A successful parse establishes neither signature validity nor trust, and no system clock is read. PEM bundles/trailing data are rejected. Existing PIV certificate reads still return unwrapped bytes; inspection is explicit.
+
 ## Rust API documentation
 
-All six crates document public types, fields, methods and factories in rustdoc, including ownership, byte formats, lifecycle errors, and FFI safety. Start with the facade's quick start, then follow its `piv` and `compatibility` re-exports. The low-level operation documentation includes a complete caller-driven exchange example.
+All seven crates document public types, fields, methods and factories in rustdoc, including ownership, byte formats, lifecycle errors, and FFI safety. Start with the facade's quick start, then follow its `piv` and `compatibility` re-exports. The low-level operation documentation includes a complete caller-driven exchange example.
 
 ```sh
 cargo doc --workspace --no-deps --locked --open
@@ -80,18 +111,19 @@ Each crate denies missing public documentation. CI builds rustdoc with warnings 
 
 ```sh
 cargo fmt --all --check
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps --locked
 cargo test --workspace --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --all-features --locked
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo build --workspace --locked
-cargo build -p canokey --target wasm32-unknown-unknown --locked
+cargo build -p canokey --all-features --target wasm32-unknown-unknown --locked
 python3 scripts/check-dependencies.py
 bash scripts/test-c-abi.sh
 ```
 
-Local validation covers 25 Rust tests and 8 executable rustdoc examples, including malformed input, resource limits, gzip corruption/expansion, ownership, and deterministic parser fuzz smoke; Linux C/C++ checks, examples, wasm, and dependency boundaries also pass. CI additionally targets macOS and Windows; local checks do not establish remote CI or hardware results.
+Local validation covers protocol and certificate-inspection tests plus executable rustdoc examples, including malformed input, resource limits, gzip corruption/expansion, ownership, and deterministic parser fuzz smoke; Linux C/C++ checks, examples, wasm, and dependency boundaries also pass. CI additionally targets macOS and Windows; local checks do not establish remote CI or hardware results.
 
-Core external dependencies provide zeroization and pure Rust gzip decoding, with no platform transport or async runtime. Cargo.lock is tracked; `references/`, build outputs, and caches are ignored.
+External dependencies are intentional: `zeroize` protects buffers, `flate2` handles gzip, and `thiserror` derives typed error implementations. Optional X.509 inspection uses `x509-parser` with verification/default features disabled and `pem-rfc7468` for strict PEM decoding; optional `serde` derives result serialization. `serde_json` is used by examples/tests, not as a core runtime dependency. `anyhow` remains an application choice because public errors need matchable variants/fields. No platform transport or async runtime is included. Cargo.lock is tracked; `references/`, build outputs, and caches are ignored.
 
 ## Documentation
 
@@ -104,4 +136,4 @@ Core external dependencies provide zeroization and pure Rust gzip decoding, with
 
 Copyright 2026 canokeys.org.
 
-Licensed under the [Apache License, Version 2.0](LICENSE). The root license applies to all original workspace crates, examples, and documentation. Each crate inherits the SPDX identifier, license file, authors, and homepage from workspace metadata; Cargo includes the shared license file in packaged crates. Third-party dependencies and read-only reference repositories retain their own licenses.
+Licensed under the [Apache License, Version 2.0](LICENSE). The root license applies to all original workspace crates, examples, and documentation. Each crate inherits the SPDX identifier, license file, authors, and homepage from workspace metadata; Cargo includes the shared license file in packaged crates. Third-party dependencies and read-only reference repositories retain their own licenses. Adapted Console certificate-extraction code retains its [upstream MIT notice](crates/canokey-x509/LICENSE.console).

@@ -14,6 +14,7 @@
 - Callers own `DeviceProfile` and `Operation<T>`. Constructors own required configuration and inputs; never retain borrowed FFI buffers, connections, or application sessions.
 - Only start/advance drive execution. Command/result getters never advance or resend. take_result transfers ownership once. Cancel/drop never send APDUs, roll back, or reconnect.
 - Reuse maintained dependencies for standard cryptography and key formats; do not implement cryptographic primitives or constant-time comparison locally. Add dependencies with their first concrete use, choose minimal features, and check MSRV, licenses, secret handling and native/wasm dependency closure. Randomness remains caller-supplied.
+- Public errors must retain typed categories/fields; use thiserror for implementations, leaving anyhow-style aggregation to applications. Standard certificate inspection lives in the optional applet-independent x509 crate; trust policy stays in callers. Test default and all-feature builds when optional APIs change.
 - Put protocol logic in its applet crate, firmware rules in compat, and probe orchestration in the facade. The internal machine interface is for composition, not transport callbacks.
 - Distinguish Unknown from Unsupported. PIV compatibility versions are not actual firmware versions. Generic YubiKey support is not CanoKey support evidence.
 

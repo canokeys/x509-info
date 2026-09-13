@@ -1,10 +1,10 @@
 # Implementation plan
 
-Status: phase 1a foundation implemented; phase 1b includes PIN/PUK, object reads, and certificate reads with bounded gzip decoding. A matching subset of the experimental C ABI exists. This work is confined to libcanokey; consumer integration requires a separate task. See [README](README.md) for actual APIs and commands, [design](docs/api-design.md) for contracts, and [references](docs/references.md) for evidence.
+Status: phase 1a foundation implemented; phase 1b includes PIN/PUK, object reads, and certificate reads with bounded gzip decoding. A matching subset of the experimental C ABI exists. Generic DER/PEM inspection is available in the optional canokey-x509 crate, with owned results and optional Serde serialization. This work is confined to libcanokey; consumer integration requires a separate task. See [README](README.md) for actual APIs and commands, [design](docs/api-design.md) for contracts, and [references](docs/references.md) for evidence.
 
 ## Goal and boundaries
 
-Share host protocol encoding, state machines, errors, and firmware compatibility across Console, ckman, and canokey-pkcs11. The library owns PIV/Admin/OATH/OpenPGP protocol logic and pure in-memory protocol cryptography. Applications own PCSC/USB/WebUSB/NFC/CCID/HID, device enumeration, permissions, connections, locking, runtimes, timeouts, system randomness, clocks, files, UI, and PKCS#11 state.
+Share host protocol encoding, state machines, errors, and firmware compatibility across Console, ckman, and canokey-pkcs11. The library owns PIV/Admin/OATH/OpenPGP protocol logic, pure in-memory protocol cryptography, and reusable certificate format inspection. Certificate trust/issuance policy remains application-owned. Applications own PCSC/USB/WebUSB/NFC/CCID/HID, device enumeration, permissions, connections, locking, runtimes, timeouts, system randomness, clocks, files, UI, and PKCS#11 state.
 
 Caller-owned profiles and operations are the common Rust/binding model. No transport trait, manager, runtime, or mutable global state belongs in the core. The crate responsibilities and dependency graph are maintained in README rather than duplicated here.
 

@@ -116,7 +116,25 @@ Certificate parsing requires exactly one nonempty 70 field, accepts absent 71 as
 
 Planned SignInput distinguishes RSA encoded block (host owns hash/PKCS1/PSS), ECDSA digest (order-bit truncation and short-value padding), Ed25519 message, SM2 digest (host computes SM3(ZA||M)), and ML-DSA message/context. Unverified contexts are rejected before sending. RSA decrypt returns the modulus-sized raw block; unpadding stays in the application. ECDH/X25519 derive validates peer encoding and returns raw shared secret; no KDF. ML-KEM decapsulation is separate with checked ciphertext/secret lengths. Algorithm names are semantic identifiers, not reconfigurable wire IDs or support promises.
 
-Files, PEM/PKCS#8, CSR/X.509 policy, PKCS#11 padding/KDF and object records stay outside the library. Enable directories, retry configuration, move/delete key, algorithm writes and new algorithms individually by evidence.
+File I/O, private-key PEM/PKCS#8 import, CSR/X.509 policy, PKCS#11 padding/KDF and object records stay outside the library. Generic certificate DER/PEM inspection is now an optional pure module, described below. Enable directories, retry configuration, move/delete key, algorithm writes and new algorithms individually by evidence.
+
+## Generic certificate inspection
+
+`canokey-x509` is independent of PIV/protocol and re-exported as `canokey::x509` under the `x509` feature. It adapts Console's Rust DER/PEM extraction using the same `x509-parser` dependency plus strict `pem-rfc7468` decoding, without FRB, logging, clocks, randomness or device state. The PIV certificate operation still unwraps its applet container; inspection is a separate synchronous pure function. Other applets/applications can use it directly.
+
+`parse_der(bytes, ParseOptions)` and `parse_pem(bytes, ParseOptions)` return an owned `CertificateInfo`. Input is borrowed only for the call; the default encoded-input budget is 1 MiB, checked before parsing/base64 decoding. Exactly one certificate is accepted; PEM permits surrounding ASCII whitespace but no bundles or extra text. DER trailing bytes and inconsistent inner/outer signature algorithm identifiers fail. Errors are typed local parsing failures, not fabricated card status errors.
+
+| Result | Representation |
+| --- | --- |
+| Subject/issuer | Presentation text plus exact Name DER, retaining attributes and RDN encodings |
+| Validity | Signed Unix-second bounds; `contains(timestamp)` takes an explicit caller timestamp |
+| Serial/signature | Original serial INTEGER bytes and signature BIT STRING bytes/unused-bit count; signature algorithm OID |
+| Public key | Algorithm/curve OIDs, complete SPKI DER, raw key bytes, optional algorithm-specific size, separate encoded bit count |
+| Extensions | OID, critical flag and raw inner value bytes in certificate order |
+
+Unknown key algorithms remain inspectable without inventing their size. This differs from Console's old fallback of encoded bytes times eight. Known EC size comes from its named curve (so P-521 remains 521, not 528); RSA size excludes INTEGER sign padding. Inspection does not validate EC points, verify signatures, process critical-extension policy, build chains or establish trust. Raw DER is retained for richer application processing.
+
+The optional `serde` feature derives Serialize on result structs; the facade feature enables both X.509 and serialization. JSON is caller-owned (`serde_json`), with byte arrays, Unix seconds and null for unknown key sizes. FRB uses explicit DTO mapping and does not require JSON. There is no new operation, result handle, cache or global state. MacOS certificate eligibility, CSR/self-signed issuance policy, mixed private-key import, and QR/image decoding stay in Console.
 
 ## Planned Batch
 
@@ -153,6 +171,9 @@ Use established libraries for standard cryptography and standard key formats. Th
 
 | Need | Dependency direction | Boundary and status |
 | --- | --- | --- |
+| Typed errors | `thiserror` | Used for protocol and X.509 errors; preserves public kinds/fields and redacted Display. `anyhow` may aggregate application errors but is not a public core error type |
+| Certificate inspection | `x509-parser` with default features disabled and `pem-rfc7468` | Used by optional canokey-x509, following Console; no signature-verification backend, transport, or OS RNG |
+| Result serialization | Optional `serde` | Owned certificate structs derive Serialize; JSON library choice stays in the application |
 | Secret erasure | `zeroize` / `Zeroizing` | Already used by protocol. `SecretBytes` adds redacted Debug and wipes old allocations during growth; replacing that behavior requires equivalent guarantees |
 | Certificate gzip | `flate2` with `rust_backend` and default features disabled | Already used by PIV. The applet layer still enforces input/output bounds, container rules, and trailing-data rejection |
 | Management-key block cryptography | RustCrypto [`aes`](https://docs.rs/aes), [`des`](https://docs.rs/des), and their matching [`cipher`](https://docs.rs/cipher) traits | Planned for external/mutual authentication. Use exact single-block operations without padding. 3DES is for legacy protocol interoperability; do not implement primitives locally |
@@ -164,7 +185,7 @@ Random bytes remain explicit caller inputs. Do not enable a dependency's OS RNG,
 
 Registry review on 2026-09-13 found concrete version/feature constraints: current `aes` 0.9.3 declares Rust 1.89, beyond this workspace's 1.85 MSRV. Current `p256` 0.14.0 enables `getrandom` through its `std` feature. Thus "latest" and default features are not automatically suitable. Select a compatible, maintained release and matching trait family, or explicitly revise the MSRV as part of implementation. Use minimal features, enable key-schedule zeroization where offered, and verify the complete resolved dependency closure on native and wasm. Registry metadata is a selection aid, not a completed integration test or an audit claim.
 
-Add these dependencies together with their first real use, rather than populating Cargo.toml with unused future crates. Check license, MSRV, maintenance/security advisories, secret handling and transitive features; track the resulting Cargo.lock. Validate library composition with known-answer vectors and protocol transcripts, including malformed inputs and authentication failure. Package reuse does not establish CanoKey firmware support.
+The Cargo resolver uses MSRV-compatible fallback, and Cargo.lock pins tested versions (including a Rust-1.85-compatible `time` for X.509 parsing). Add further dependencies together with their first real use, rather than populating Cargo.toml with unused future crates. Check license, MSRV, maintenance/security advisories, secret handling and transitive features; track the resulting Cargo.lock. Validate library composition with known-answer vectors and protocol transcripts, including malformed inputs and authentication failure. Package reuse does not establish CanoKey firmware support.
 
 The existing BER TLV reader is a small applet framing codec with explicit bounds and duplicate preservation, distinct from X.509/DER schema handling. Reuse a BER dependency if it satisfies these semantics without losing evidence or adding platform I/O; do not replace it blindly with a DER-only parser. Certificate trust and X.509 policy remain outside the core.
 

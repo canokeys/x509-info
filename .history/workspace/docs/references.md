@@ -27,6 +27,8 @@ Relevant implementations, regression tests, and conventions:
 - [test/helper/utils/oath_card_test.dart](https://github.com/canokeys/canokey-console/blob/63863ef66ff0766754ee8f5bee28b9e977889f75/test/helper/utils/oath_card_test.dart)
 - [test/controller/applets/piv/piv_firmware_compatibility_test.dart](https://github.com/canokeys/canokey-console/blob/63863ef66ff0766754ee8f5bee28b9e977889f75/test/controller/applets/piv/piv_firmware_compatibility_test.dart)
 
+The reusable certificate inspection in `rust/src/api/crypto.rs` (`X509CertData`, `gen_x590_meta`, and the DER/PEM entry points) is adapted in `canokey-x509`. See the [pinned Rust source](https://github.com/canokeys/canokey-console/blob/63863ef66ff0766754ee8f5bee28b9e977889f75/rust/src/api/crypto.rs) and [PIV application helpers](https://github.com/canokeys/canokey-console/blob/63863ef66ff0766754ee8f5bee28b9e977889f75/rust/src/api/piv_crypto.rs). The source repository's MIT notice is retained in [LICENSE.console](../crates/canokey-x509/LICENSE.console). Adaptations add owned typed errors/fields, input bounds, strict PEM consumption, explicit timestamps and optional serialization; unknown algorithm sizes remain unknown. Tests use a newly generated synthetic certificate, not an upstream/user fixture. No upstream files were modified.
+
 ## canokey-manager
 
 Relevant implementations, regression tests, and conventions:

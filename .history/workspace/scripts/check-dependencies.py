@@ -3,7 +3,7 @@
 import json
 import subprocess
 
-metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--format-version", "1"]))
+metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--all-features", "--locked", "--format-version", "1"]))
 packages = {p["id"]: p for p in metadata["packages"]}
 nodes = {n["id"]: n for n in metadata["resolve"]["nodes"]}
 forbidden = {"pcsc", "pcsc-sys", "rusb", "libusb1-sys", "hidapi", "tokio", "async-std",
