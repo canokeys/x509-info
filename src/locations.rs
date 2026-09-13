@@ -126,17 +126,16 @@ fn crypto_names(
     names: &OidNames,
 ) -> Option<Vec<GeneralName>> {
     use x509_cert::der::Encode;
-    use x509_parser::asn1_rs::{Any, FromDer};
+    use x509_parser::prelude::FromDer;
     list.iter()
         .map(|item| {
             // Reuse the same GeneralName projection for both format libraries. Encoding
             // canonical in-memory values avoids duplicating string and IP conversion rules.
             let der = item.to_der().ok()?;
-            let (rest, any) = Any::from_der(&der).ok()?;
+            let (rest, name) = backend::GeneralName::from_der(&der).ok()?;
             if !rest.is_empty() {
                 return None;
             }
-            let name = backend::GeneralName::try_from(any).ok()?;
             Some(general_name(&name, names))
         })
         .collect()
