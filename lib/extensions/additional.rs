@@ -10,6 +10,7 @@ use x509_cert::{
 /// Policy counters asserted by the certificate, without path-policy evaluation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct PolicyConstraints {
     /// Number of additional certificates before an explicit policy is required.
@@ -21,6 +22,7 @@ pub struct PolicyConstraints {
 /// One issuer-to-subject policy mapping; order and duplicate pairs are retained.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct PolicyMapping {
     /// Issuer domain policy OID in dotted-decimal notation.
@@ -37,6 +39,7 @@ pub struct PolicyMapping {
 /// The backend accepts years 1970–9999; other encodings yield a malformed finding.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct PrivateKeyUsagePeriod {
     /// Inclusive start in Unix seconds, if encoded; no clock is read.
@@ -48,6 +51,7 @@ pub struct PrivateKeyUsagePeriod {
 /// A subject directory attribute with its multi-valued ASN.1 SET preserved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct DirectoryAttribute {
     /// Dotted-decimal attribute OID.
@@ -62,6 +66,7 @@ pub struct DirectoryAttribute {
 /// Legacy Netscape certificate-type assertions, not enforced permissions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct NetscapeCertificateType {
     /// SSL client assertion.

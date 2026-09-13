@@ -250,8 +250,8 @@ DER/PEM parsing; report deserialization does not reconstruct a trusted certifica
 ## Command-line utility and binding example
 
 The [x509-info binary](bin/README.md) replaces the details and export
-examples. It supports text, JSON, CBOR, TOML and DER/PEM conversion, file/stdin
-input, bounded reads, and file/stdout output. Reports include the additional
+examples. It supports text, JSON, JSON Lines, YAML, CBOR, MessagePack, TOML and
+DER/PEM conversion, file/stdin input, bounded reads, and file/stdout output. Reports include the additional
 name/key accessors and available diagnostics as well as the core result fields.
 
 ```sh
@@ -300,14 +300,18 @@ lib/
   tests/          Internal decoder tests
 bin/
   main.rs         clap arguments, bounded input and output
-  report.rs       Report enrichment and text/JSON/CBOR/TOML rendering
+  report.rs       Typed report envelope, enrichment and text/TOML rendering
   encoding.rs     Base64/native byte fields and UUID display for CLI reports
+  schema.rs       Type-derived CLI schemas with the same encoding rules
+  SCHEMA.md       Schema generation, versioning and format contracts
   README.md       Command-line usage
 tests/            Integration tests and certificate fixtures
 examples/         Binding DTO example
 ```
 
 Default features build only the library. `serde` adds serialization of owned
-types; `cli` enables `serde`, clap and the binary's format serializers. Library
+types; `schema` adds Schemars implementations for those source types. `cli` enables
+`schema`, clap and the binary's format serializers. Its `--schema` output describes
+the adapted report; see [the CLI schema contract](bin/SCHEMA.md). Library
 consumers and the CanoKey facade do not enable `cli`. The binary uses only public
 library APIs; ASN.1 interpretation belongs in `lib/`.

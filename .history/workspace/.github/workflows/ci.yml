@@ -35,6 +35,12 @@ jobs:
       - run: cargo run -p x509-info --example binding_dto --locked
       - run: cargo run -p x509-info --features cli --locked -- crates/x509-info/tests/fixtures/details.pem --format json
       - if: runner.os == 'Linux'
+        name: Check CLI schemas and export formats
+        run: |
+          python3 -m venv "$RUNNER_TEMP/x509-schema-env"
+          "$RUNNER_TEMP/x509-schema-env/bin/python" -m pip install -r scripts/requirements-schema.txt
+          "$RUNNER_TEMP/x509-schema-env/bin/python" scripts/check-x509-schema.py target/debug/x509-info
+      - if: runner.os == 'Linux'
         run: cargo package -p x509-info --locked
       - run: cargo run -p canokey --example probe --locked
       - run: cargo run -p canokey --example read_certificate --locked

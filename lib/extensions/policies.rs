@@ -7,6 +7,7 @@ use x509_cert::{
 /// One asserted certificate policy; OID recognition never implies policy compliance.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct CertificatePolicy {
     /// Dotted-decimal policy identifier, including unknown/private policies.
@@ -20,6 +21,7 @@ pub struct CertificatePolicy {
 /// Interpretation of a policy qualifier, without policy evaluation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(
     feature = "serde",
     serde(tag = "kind", content = "value", rename_all = "snake_case")
@@ -39,6 +41,7 @@ pub enum PolicyQualifierDetails {
 /// One policy qualifier with its original value representation retained.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct PolicyQualifier {
     /// Dotted-decimal qualifier identifier.
@@ -132,6 +135,7 @@ mod tests {
 /// Certificate-policy notice, preserving optional fields without display policy.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct UserNotice {
     /// Organization and notice numbers, when encoded.
@@ -142,6 +146,7 @@ pub struct UserNotice {
 /// Organization and referenced notice numbers; numbers are not range-checked.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct NoticeReference {
     /// Decoded DisplayText organization string.

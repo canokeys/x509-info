@@ -7,6 +7,7 @@ use x509_parser::{asn1_rs::ToDer, x509::AlgorithmIdentifier};
 /// Parameter inspection state, separate from algorithm recognition and trust.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[non_exhaustive]
 pub enum ParameterStatus {
@@ -25,6 +26,7 @@ pub enum ParameterStatus {
 /// No assertion is made that the parameters are secure or usable with a given key.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct PssParameters {
     /// Dotted-decimal message hash OID (SHA-1 when defaulted).
@@ -42,6 +44,7 @@ pub struct PssParameters {
 /// Algorithm information with an optional common label and preserved parameters.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct AlgorithmInfo {
     /// Dotted-decimal algorithm OID; always retained even if unrecognized.
@@ -138,6 +141,7 @@ pub(crate) fn rsa_bits(bytes: &[u8]) -> Option<usize> {
 /// Inspection state for public-key bytes, separate from algorithm parameters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[non_exhaustive]
 pub enum KeyDataStatus {

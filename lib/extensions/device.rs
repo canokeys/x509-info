@@ -8,6 +8,7 @@ use x509_parser::asn1_rs::Tag;
 /// FIDO U2F transport assertions. Unknown bits are retained; no transport is selected.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct FidoTransports {
     /// Bluetooth Classic bit 0.
@@ -31,6 +32,7 @@ pub struct FidoTransports {
 /// Microsoft certificate-template fields without enrollment/template policy.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct CertificateTemplate {
     /// Dotted-decimal template OID.

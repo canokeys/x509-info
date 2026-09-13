@@ -9,6 +9,10 @@ is performed. Inner and outer signature algorithm fields are both retained.
 cargo install --path crates/x509-info --features cli --locked
 x509-info certificate.pem
 x509-info certificate.der --format json --output report.json
+x509-info certificate.pem --format yaml --output report.yaml
+x509-info certificate.pem --format jsonl --output report.jsonl
+x509-info certificate.pem --format messagepack --output report.msgpack
+x509-info --schema --output report.schema.json
 x509-info certificate.pem --format cbor --output report.cbor
 x509-info certificate.pem --format toml --summary --output report.toml
 x509-info certificate.pem --format der --output certificate.der
@@ -33,7 +37,7 @@ the library's summary schema. The current report version is 2. Decoded names use
 `decoded_fields`, or `decode_diagnostic` if interpretation fails; original encodings
 remain available in the representations below.
 
-Text, JSON and TOML use standard padded Base64 without embedded line breaks for
+Text, JSON, JSON Lines, YAML and TOML use standard padded Base64 without embedded line breaks for
 raw encoding blocks, including certificate/name/SPKI DER, algorithm parameters,
 key bytes, signatures, extension/qualifier DER, opaque name contents and SCT
 encodings. These fields have a `_base64` suffix (for example `der_base64` and
@@ -42,14 +46,14 @@ DN text stays in `value`, with original octets in `value_raw_base64`.
 
 Fingerprints, serial numbers, key/log identifiers, integer content, encoded
 flag octets and public-key components retain lowercase hex with a `_hex` suffix. Numeric lists
-such as TLS feature numbers remain arrays of numbers. CBOR uses native byte strings
+such as TLS feature numbers remain arrays of numbers. CBOR and MessagePack use native byte strings
 for the raw blocks, with no `_base64` suffix; identifiers and numeric fields use the
 same presentation as the text formats. No byte arrays are guessed from numeric lists.
 
 FIDO AAGUID details use `{"kind":"fido_aaguid","value":{"uuid":"08987058-cadc-4b81-b6e1-30de50dcbe96"}}`.
 Formatting preserves UUID byte order and does not enforce version, variant or
 nonzero values. If the length is not 16 bytes, `value` contains `uuid: null`,
-`raw_base64` (CBOR: `raw` bytes), and an `invalid_length` format diagnostic.
+`raw_base64` (CBOR/MessagePack: `raw` bytes), and an `invalid_length` format diagnostic.
 This is a display limitation and does not reject the certificate. Windows GUID
 mixed-endian interpretation is not applied to FIDO AAGUIDs.
 
@@ -62,3 +66,8 @@ These are explicit TOML representation differences, not certificate data changes
 SCT timestamps remain milliseconds; certificate/private-key timestamps are seconds.
 DER/PEM output preserves the original DER, including its signature, rather than
 reconstructing a certificate from a report. Reports cannot be imported as certificates.
+
+
+Generate a self-contained schema with `--schema` or `--schema --summary`.
+See [the schema contract](SCHEMA.md) for automatic generation, versioning,
+format differences and validation commands.

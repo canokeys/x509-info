@@ -3,6 +3,7 @@ use x509_cert::der::{asn1::OctetString, Decode};
 /// One embedded SCT entry. No log lookup or signature verification is performed.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(
     feature = "serde",
     serde(tag = "kind", content = "value", rename_all = "snake_case")
@@ -23,6 +24,7 @@ pub enum SctEntry {
 /// RFC 6962 v1 SCT fields, independent of the input certificate buffer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct SignedCertificateTimestamp {
     /// 32-byte CT log identifier in lowercase hex; not a trusted log name.

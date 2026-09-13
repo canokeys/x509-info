@@ -1,5 +1,62 @@
-use serde_json::{json, Value};
-use x509_info::{CertificateInfo, GeneralName};
+use serde_json::Value;
+use x509_info::{CertificateInfo, DecodeDiagnostic, GeneralName, PublicKeyDetails};
+
+pub(crate) const VERSION: u32 = 2;
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub(crate) struct Report<C> {
+    report_version: u32,
+    certificate: C,
+    public_key_details: KeyDetails,
+    spki_sha256_fingerprint_hex: String,
+    name_diagnostics: Vec<NameDiagnostic>,
+    directory_attribute_values: Vec<DirectoryValues>,
+    extension_diagnostics: Vec<ExtensionDiagnostic>,
+    policy_qualifier_diagnostics: Vec<QualifierDiagnostic>,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct KeyDetails {
+    fields: Option<PublicKeyDetails>,
+    diagnostic: Option<DecodeDiagnostic>,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct NameDiagnostic {
+    name: String,
+    rdn_index: usize,
+    attribute_index: usize,
+    diagnostic: DecodeDiagnostic,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct DirectoryValues {
+    extension_index: usize,
+    attribute_index: usize,
+    values: Vec<DirectoryText>,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+enum DirectoryText {
+    Text { text: String },
+    Diagnostic { diagnostic: DecodeDiagnostic },
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct ExtensionDiagnostic {
+    index: usize,
+    oid: String,
+    diagnostic: DecodeDiagnostic,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct QualifierDiagnostic {
+    extension_index: usize,
+    policy_index: usize,
+    qualifier_index: usize,
+    diagnostic: DecodeDiagnostic,
+}
 
 pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Value> {
     let certificate = if summary {
@@ -8,18 +65,26 @@ pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Va
         serde_json::to_value(info)?
     };
     let key = match info.public_key.details() {
-        Ok(value) => json!({"fields":value,"diagnostic":null}),
-        Err(error) => json!({"fields":null,"diagnostic":error}),
+        Ok(fields) => KeyDetails {
+            fields,
+            diagnostic: None,
+        },
+        Err(error) => KeyDetails {
+            fields: None,
+            diagnostic: Some(error),
+        },
     };
     let mut name_diagnostics = Vec::new();
     for (which, name) in [("subject", &info.subject), ("issuer", &info.issuer)] {
         for (rdn_index, rdn) in name.rdns.iter().enumerate() {
             for (attribute_index, attribute) in rdn.iter().enumerate() {
                 if let Some(diagnostic) = attribute.diagnostic() {
-                    name_diagnostics.push(json!({
-                        "name": which, "rdn_index": rdn_index,
-                        "attribute_index": attribute_index, "diagnostic": diagnostic
-                    }));
+                    name_diagnostics.push(NameDiagnostic {
+                        name: which.into(),
+                        rdn_index,
+                        attribute_index,
+                        diagnostic,
+                    });
                 }
             }
         }
@@ -29,9 +94,11 @@ pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Va
     let mut policy_qualifier_diagnostics = Vec::new();
     for (extension_index, extension) in info.extensions.iter().enumerate() {
         if let Some(diagnostic) = extension.diagnostic() {
-            extension_diagnostics.push(json!({
-                "index": extension_index, "oid": extension.oid, "diagnostic": diagnostic
-            }));
+            extension_diagnostics.push(ExtensionDiagnostic {
+                index: extension_index,
+                oid: extension.oid.clone(),
+                diagnostic,
+            });
         }
         match &extension.details {
             x509_info::ExtensionDetails::SubjectDirectoryAttributes(attributes) => {
@@ -40,24 +107,27 @@ pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Va
                         .text_values()
                         .into_iter()
                         .map(|result| match result {
-                            Ok(text) => json!({"text": text}),
-                            Err(diagnostic) => json!({"diagnostic": diagnostic}),
+                            Ok(text) => DirectoryText::Text { text },
+                            Err(diagnostic) => DirectoryText::Diagnostic { diagnostic },
                         })
                         .collect();
-                    directory_attribute_values.push(json!({
-                        "extension_index": extension_index,
-                        "attribute_index": attribute_index, "values": values
-                    }));
+                    directory_attribute_values.push(DirectoryValues {
+                        extension_index,
+                        attribute_index,
+                        values,
+                    });
                 }
             }
             x509_info::ExtensionDetails::CertificatePolicies(policies) => {
                 for (policy_index, policy) in policies.iter().enumerate() {
                     for (qualifier_index, qualifier) in policy.qualifiers.iter().enumerate() {
                         if let Some(diagnostic) = qualifier.diagnostic() {
-                            policy_qualifier_diagnostics.push(json!({
-                                "extension_index": extension_index, "policy_index": policy_index,
-                                "qualifier_index": qualifier_index, "diagnostic": diagnostic
-                            }));
+                            policy_qualifier_diagnostics.push(QualifierDiagnostic {
+                                extension_index,
+                                policy_index,
+                                qualifier_index,
+                                diagnostic,
+                            });
                         }
                     }
                 }
@@ -65,16 +135,16 @@ pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Va
             _ => {}
         }
     }
-    let mut value = json!({
-        "report_version": 2,
-        "certificate": certificate,
-        "public_key_details": key,
-        "spki_sha256_fingerprint_hex": hex::encode(info.public_key.spki_sha256_fingerprint()),
-        "name_diagnostics": name_diagnostics,
-        "directory_attribute_values": directory_attribute_values,
-        "extension_diagnostics": extension_diagnostics,
-        "policy_qualifier_diagnostics": policy_qualifier_diagnostics
-    });
+    let mut value = serde_json::to_value(Report {
+        report_version: VERSION,
+        certificate,
+        public_key_details: key,
+        spki_sha256_fingerprint_hex: hex::encode(info.public_key.spki_sha256_fingerprint()),
+        name_diagnostics,
+        directory_attribute_values,
+        extension_diagnostics,
+        policy_qualifier_diagnostics,
+    })?;
     enrich(&mut value)?;
     Ok(value)
 }
@@ -197,6 +267,7 @@ pub(crate) fn text(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     #[test]
     fn names_are_enriched_and_toml_rules_are_explicit() {
         let mut value = json!({"kind":"other_name","value":{"oid":"1.3.6.1.4.1.311.20.2.3","name":null,"value_der_hex":"a0030c0161"}});

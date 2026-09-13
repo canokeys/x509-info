@@ -187,7 +187,19 @@ fn clap_validates_arguments_and_documents_formats() {
         assert!(String::from_utf8_lossy(&output.stderr).contains("error:"));
     }
     let help = String::from_utf8(success(&["--help"], &[])).unwrap();
-    assert!(help.contains("text, json, cbor, toml, der, pem"));
+    for format in [
+        "text",
+        "json",
+        "jsonl",
+        "yaml",
+        "messagepack",
+        "cbor",
+        "toml",
+        "der",
+        "pem",
+    ] {
+        assert!(help.contains(format));
+    }
     assert!(String::from_utf8(success(&["--version"], &[]))
         .unwrap()
         .contains(env!("CARGO_PKG_VERSION")));
@@ -259,4 +271,46 @@ fn fido_uuid_and_unusual_lengths_survive_all_reports() {
         assert!(output.contains("invalid_length"));
     }
     assert_eq!(success(&["-f", "der"], &der), der);
+}
+
+#[test]
+fn json_lines_and_messagepack_preserve_the_report_model() {
+    let json: serde_json::Value = serde_json::from_slice(&success(&["-f", "json"], PEM)).unwrap();
+    let line = success(&["-f", "jsonl"], PEM);
+    assert_eq!(line.iter().filter(|&&c| c == b'\n').count(), 1);
+    assert_eq!(line.last(), Some(&b'\n'));
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&line).unwrap(),
+        json
+    );
+    let cbor: ciborium::Value =
+        ciborium::from_reader(success(&["-f", "cbor"], PEM).as_slice()).unwrap();
+    let packed = success(&["-f", "messagepack"], PEM);
+    let messagepack: ciborium::Value = rmp_serde::from_slice(&packed).unwrap();
+    assert_eq!(messagepack, cbor);
+    assert_eq!(success(&["-f", "msgpack"], PEM), packed);
+    let yaml = String::from_utf8(success(&["-f", "yaml"], PEM)).unwrap();
+    assert!(yaml.contains("der_base64:"));
+    assert!(yaml.contains("report_version: 2"));
+}
+
+#[test]
+fn schemas_are_generated_without_certificate_input() {
+    for args in [vec!["--schema"], vec!["--schema", "--summary"]] {
+        let schema: serde_json::Value = serde_json::from_slice(&success(&args, &[])).unwrap();
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
+        assert_eq!(schema["properties"]["report_version"]["const"], 2);
+        assert!(schema["$defs"].as_object().unwrap().len() > 20);
+    }
+    for args in [
+        vec!["--schema", "certificate.pem"],
+        vec!["--schema", "--format", "der"],
+        vec!["--schema", "--input-format", "pem"],
+        vec!["--schema", "--max-input-bytes", "10"],
+    ] {
+        assert_eq!(run(&args, &[]).status.code(), Some(2));
+    }
 }

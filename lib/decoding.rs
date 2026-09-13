@@ -3,6 +3,7 @@ use x509_parser::asn1_rs::{Any, Class, FromDer, Tag};
 /// Why a field could not be decoded; none of these categories is a trust verdict.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[non_exhaustive]
 pub enum DecodeIssue {
@@ -22,6 +23,7 @@ pub enum DecodeIssue {
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[error("{field}: {issue:?}")]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct DecodeDiagnostic {
     /// Stable category suitable for matching without parsing Display text.
@@ -44,6 +46,7 @@ impl DecodeDiagnostic {
 /// ASN.1 INTEGER value without a machine-integer truncation or sign guess.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct IntegerValue {
     /// Complete two's-complement content octets in lowercase hex, retaining padding.

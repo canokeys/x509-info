@@ -8,6 +8,7 @@ use x509_parser::prelude::FromDer;
 /// A name-constraint base. IP constraints encode an address and mask, not a host.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(
     feature = "serde",
     serde(tag = "kind", content = "value", rename_all = "snake_case")
@@ -30,6 +31,7 @@ pub enum ConstraintName {
 /// One permitted/excluded subtree. This model does not evaluate name matching.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct GeneralSubtree {
     /// Name or address/mask base.
@@ -45,6 +47,7 @@ pub struct GeneralSubtree {
 /// values outside that representation yield a malformed extension finding.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct NameConstraints {
     /// Permitted subtrees in encoded order, if present.

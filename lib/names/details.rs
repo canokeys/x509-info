@@ -5,6 +5,7 @@ use x509_parser::asn1_rs::{Class, Tag};
 /// Additional fields decoded from a GeneralName's retained encoding.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(
     feature = "serde",
     serde(tag = "kind", content = "value", rename_all = "snake_case")

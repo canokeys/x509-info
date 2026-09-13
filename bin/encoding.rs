@@ -1,7 +1,72 @@
 // Report-only byte and identifier formatting. Library Serde contracts stay intact.
 use base64ct::{Base64, Encoding};
 use ciborium::Value as Binary;
-use serde_json::{json, Value};
+use serde_json::Value;
+
+// Shared by report conversion and schema generation.
+#[derive(Clone, Copy)]
+pub(crate) enum FieldFormat {
+    Octets,
+    Hex,
+    HexList,
+    Serial,
+    NamedHex,
+}
+pub(crate) fn field_rule(
+    key: &str,
+    kind: Option<&str>,
+    opaque: bool,
+) -> Option<(String, FieldFormat)> {
+    use FieldFormat::*;
+    let (name, format) = match key {
+        "der" | "spki_der" | "parameters_der" | "key_bytes" | "signature_value" | "value_der" => {
+            (key, Octets)
+        }
+        "serial_number" => ("serial_number_hex", Serial),
+        "value_der_hex" | "encoded_hex" | "extensions_hex" | "signature_hex" | "raw_hex" => {
+            (key.trim_end_matches("_hex"), Hex)
+        }
+        "values_der_hex" => ("values_der", HexList),
+        "value_hex" => ("value_raw", Hex),
+        "content_hex" if opaque => ("content", Hex),
+        "value"
+            if matches!(
+                kind,
+                Some("subject_key_identifier" | "malformed_ip" | "edwards" | "montgomery")
+            ) =>
+        {
+            ("value_hex", NamedHex)
+        }
+        _ => return None,
+    };
+    Some((name.into(), format))
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum Aaguid {
+    Uuid {
+        uuid: String,
+    },
+    Unformatted {
+        uuid: (),
+        raw_hex: String,
+        format_diagnostic: AaguidDiagnostic,
+    },
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+pub(crate) struct AaguidDiagnostic {
+    issue: AaguidIssue,
+    field: String,
+    expected_bytes: u8,
+}
+
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+enum AaguidIssue {
+    InvalidLength,
+}
 
 // Convert known byte fields explicitly; numeric lists (TLS features, notice
 // numbers, transport bits) must never be guessed to be byte arrays.
@@ -21,71 +86,49 @@ pub(crate) fn binary(value: Value) -> crate::Result<Binary> {
             if kind.as_deref() == Some("fido_aaguid") {
                 let bytes = hex_bytes(fields.remove("value").ok_or("missing AAGUID")?)?;
                 let formatted = match uuid::Uuid::from_slice(&bytes) {
-                    Ok(id) => json!({"uuid": id.hyphenated().to_string()}),
-                    Err(_) => json!({
-                        "uuid": null,
-                        "raw_hex": hex::encode(bytes),
-                        "format_diagnostic": {
-                            "issue": "invalid_length",
-                            "field": "AAGUID",
-                            "expected_bytes": 16
-                        }
-                    }),
+                    Ok(id) => Aaguid::Uuid {
+                        uuid: id.hyphenated().to_string(),
+                    },
+                    Err(_) => Aaguid::Unformatted {
+                        uuid: (),
+                        raw_hex: hex::encode(bytes),
+                        format_diagnostic: AaguidDiagnostic {
+                            issue: AaguidIssue::InvalidLength,
+                            field: "AAGUID".into(),
+                            expected_bytes: 16,
+                        },
+                    },
                 };
-                fields.insert("value".into(), formatted);
+                fields.insert("value".into(), serde_json::to_value(formatted)?);
             }
             let opaque_content = fields.contains_key("constructed");
             let mut output = Vec::new();
             for (key, value) in fields {
-                let (key, value) = match key.as_str() {
-                    "der" | "spki_der" | "parameters_der" | "key_bytes" | "signature_value"
-                    | "value_der" => {
-                        let bytes = if value.is_null() {
-                            Binary::Null
-                        } else {
-                            Binary::Bytes(serde_json::from_value::<Vec<u8>>(value)?)
-                        };
-                        (key, bytes)
-                    }
-                    "serial_number" => (
-                        "serial_number_hex".into(),
-                        Binary::Text(hex::encode(serde_json::from_value::<Vec<u8>>(value)?)),
-                    ),
-                    "value_der_hex" | "encoded_hex" | "extensions_hex" | "signature_hex"
-                    | "raw_hex" => (
-                        key.trim_end_matches("_hex").into(),
-                        Binary::Bytes(hex_bytes(value)?),
-                    ),
-                    "values_der_hex" => (
-                        "values_der".into(),
-                        Binary::Array(
+                let (key, value) = if let Some((name, format)) =
+                    field_rule(&key, kind.as_deref(), opaque_content)
+                {
+                    use FieldFormat::*;
+                    let value = match format {
+                        Octets if value.is_null() => Binary::Null,
+                        Octets => Binary::Bytes(serde_json::from_value::<Vec<u8>>(value)?),
+                        Hex => Binary::Bytes(hex_bytes(value)?),
+                        HexList => Binary::Array(
                             value
                                 .as_array()
                                 .ok_or("invalid DER values")?
                                 .iter()
                                 .cloned()
-                                .map(|value| Ok(Binary::Bytes(hex_bytes(value)?)))
+                                .map(|v| Ok(Binary::Bytes(hex_bytes(v)?)))
                                 .collect::<crate::Result<_>>()?,
                         ),
-                    ),
-                    "value_hex" => ("value_raw".into(), Binary::Bytes(hex_bytes(value)?)),
-                    "content_hex" if opaque_content => {
-                        ("content".into(), Binary::Bytes(hex_bytes(value)?))
-                    }
-                    "value"
-                        if matches!(
-                            kind.as_deref(),
-                            Some(
-                                "subject_key_identifier"
-                                    | "malformed_ip"
-                                    | "edwards"
-                                    | "montgomery"
-                            )
-                        ) =>
-                    {
-                        ("value_hex".into(), binary(value)?)
-                    }
-                    _ => (key, binary(value)?),
+                        Serial => {
+                            Binary::Text(hex::encode(serde_json::from_value::<Vec<u8>>(value)?))
+                        }
+                        NamedHex => binary(value)?,
+                    };
+                    (name, value)
+                } else {
+                    (key, binary(value)?)
                 };
                 output.push((Binary::Text(key), value));
             }
@@ -133,6 +176,7 @@ pub(crate) fn textual(value: Binary) -> crate::Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn opaque_bytes_roundtrip_without_converting_numeric_lists() {

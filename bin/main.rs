@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 mod encoding;
 mod report;
+mod schema;
 use std::{
     io::{Read, Write},
     path::PathBuf,
@@ -15,6 +16,11 @@ use clap::{CommandFactory, Parser, ValueEnum};
 enum OutputFormat {
     Text,
     Json,
+    /// One compact JSON report followed by a newline.
+    Jsonl,
+    Yaml,
+    #[value(alias = "msgpack")]
+    Messagepack,
     Cbor,
     Toml,
     Der,
@@ -51,6 +57,9 @@ struct Args {
     /// Omit duplicate DER/raw buffers from reports; retain parsed fields.
     #[arg(long)]
     summary: bool,
+    /// Print the JSON Schema for full reports (or --summary), without reading a certificate.
+    #[arg(long, conflicts_with_all = ["input", "input_format", "max_input_bytes", "format"])]
+    schema: bool,
     /// Maximum encoded input size in bytes.
     #[arg(long, default_value = "1048576")]
     max_input_bytes: std::num::NonZeroUsize,
@@ -64,7 +73,13 @@ fn run(args: Args) -> Result<()> {
         input_format,
         summary,
         max_input_bytes: limit,
+        schema,
     } = args;
+    if schema {
+        let mut bytes = serde_json::to_vec_pretty(&schema::generate(summary)?)?;
+        bytes.push(b'\n');
+        return write_output(output, bytes);
+    }
     let limit = limit.get();
     let read_limit = u64::try_from(limit)?
         .checked_add(1)
@@ -97,7 +112,13 @@ fn run(args: Args) -> Result<()> {
             pem_rfc7468::encode_string("CERTIFICATE", pem_rfc7468::LineEnding::LF, &info.der)?
                 .into_bytes()
         }
-        OutputFormat::Text | OutputFormat::Json | OutputFormat::Cbor | OutputFormat::Toml => {
+        OutputFormat::Text
+        | OutputFormat::Json
+        | OutputFormat::Jsonl
+        | OutputFormat::Yaml
+        | OutputFormat::Messagepack
+        | OutputFormat::Cbor
+        | OutputFormat::Toml => {
             let value = encoding::binary(report::inspect(&info, summary)?)?;
             match format {
                 OutputFormat::Json => {
@@ -105,6 +126,15 @@ fn run(args: Args) -> Result<()> {
                     s.push(b'\n');
                     s
                 }
+                OutputFormat::Jsonl => {
+                    let mut bytes = serde_json::to_vec(&encoding::textual(value)?)?;
+                    bytes.push(b'\n');
+                    bytes
+                }
+                OutputFormat::Yaml => {
+                    serde_yaml_ng::to_string(&encoding::textual(value)?)?.into_bytes()
+                }
+                OutputFormat::Messagepack => rmp_serde::to_vec_named(&value)?,
                 OutputFormat::Cbor => {
                     let mut out = Vec::new();
                     ciborium::into_writer(&value, &mut out)?;
@@ -119,6 +149,10 @@ fn run(args: Args) -> Result<()> {
             }
         }
     };
+    write_output(output, bytes)
+}
+
+fn write_output(output: Option<PathBuf>, bytes: Vec<u8>) -> Result<()> {
     match output
         .as_deref()
         .filter(|p| *p != std::path::Path::new("-"))

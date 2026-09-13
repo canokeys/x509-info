@@ -5,6 +5,7 @@ use sha2::{Digest, Sha256};
 /// Parsed public-key fields. This performs no arithmetic or mathematical validation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(
     feature = "serde",
     serde(tag = "kind", content = "value", rename_all = "snake_case")

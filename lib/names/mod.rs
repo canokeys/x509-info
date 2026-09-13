@@ -6,6 +6,7 @@ use x509_parser::x509::{AttributeTypeAndValue, X509Name};
 /// One attribute in a relative distinguished name; no normalization or name matching.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct NameAttribute {
     /// Dotted-decimal attribute OID, including unknown attributes.
@@ -24,6 +25,7 @@ pub struct NameAttribute {
 /// Owned distinguished name, retaining RDN grouping, repeated attributes and order.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct DistinguishedName {
     /// Parser-generated display text; do not use string equality as name matching.

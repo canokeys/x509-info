@@ -18,6 +18,7 @@ use x509_parser::{
 /// An owned GeneralName. Values are decoded, not validated as identities or URLs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(
     feature = "serde",
     serde(tag = "kind", content = "value", rename_all = "snake_case")
@@ -73,6 +74,7 @@ pub enum GeneralName {
 /// Decoded Key Usage bits. These describe assertions, not enforced permissions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct KeyUsage {
     /// Digital signatures other than certificate/CRL signing.
@@ -98,6 +100,7 @@ pub struct KeyUsage {
 /// An Extended Key Usage purpose, preserving OIDs, order and repetitions.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct KeyPurpose {
     /// Dotted-decimal key-purpose OID.
@@ -110,6 +113,7 @@ pub struct KeyPurpose {
 /// Malformed/unsupported values and duplicate extensions never disappear silently.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(
     feature = "serde",
     serde(tag = "kind", content = "value", rename_all = "snake_case")
@@ -188,6 +192,7 @@ pub enum ExtensionDetails {
 /// An extension and its decoded information, retained in certificate order.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct ExtensionInfo {
     /// Dotted-decimal extension OID, including unknown OIDs.

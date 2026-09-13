@@ -7,6 +7,7 @@ use x509_parser::extensions as backend;
 /// Matching these fields does not establish an issuer relationship or trust.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct AuthorityKeyIdentifier {
     /// Key identifier octets in lowercase hex, if present.
@@ -20,6 +21,7 @@ pub struct AuthorityKeyIdentifier {
 /// An AIA/SIA access method and its location. This library never retrieves it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct AccessDescription {
     /// Dotted-decimal method OID, including unrecognized methods.
@@ -33,6 +35,7 @@ pub struct AccessDescription {
 /// A CRL distribution-point name; relative RDNs are not resolved automatically.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(
     feature = "serde",
     serde(tag = "kind", content = "value", rename_all = "snake_case")
@@ -48,6 +51,7 @@ pub enum DistributionPointName {
 /// A CRL/freshest-CRL distribution point, without revocation processing or I/O.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct DistributionPoint {
     /// Encoded distribution-point name, when present.

@@ -18,6 +18,10 @@
 //! arrays). JSON belongs to callers; FRB can map these fields to its own DTOs.
 //! No public result borrows backend types or requires a registry/handle lifecycle.
 //!
+//! Enable `schema` for Schemars schemas of the library's Serde result types.
+//! These describe source representations. The optional CLI's `--schema` command
+//! additionally accounts for report field names, Base64 and UUID formatting.
+//!
 //! # Example
 //!
 //! ```
@@ -124,6 +128,7 @@ pub enum Error {
 /// Certificate validity interval as signed Unix seconds, independent of a clock.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Validity {
     /// Inclusive notBefore timestamp, measured from 1970-01-01T00:00:00Z.
     pub not_before_unix: i64,
@@ -141,6 +146,7 @@ impl Validity {
 /// Owned public-key algorithm and encoding, without performing key validation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct PublicKeyInfo {
     /// Algorithm name, OID and parameter inspection.
@@ -170,6 +176,7 @@ pub struct PublicKeyInfo {
 /// available for consumers that need richer policy/extension processing.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct CertificateInfo {
     /// Outer signature algorithm with decoded parameters where supported.

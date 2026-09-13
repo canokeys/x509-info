@@ -6,6 +6,7 @@ use crate::{
 /// Display-oriented name data without the complete Name DER.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct NameSummary {
     /// Presentation string, not a normalized identity.
@@ -25,6 +26,7 @@ impl From<&DistinguishedName> for NameSummary {
 /// Algorithm description without raw parameter bytes; see AlgorithmInfo for full data.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct AlgorithmSummary {
     /// Dotted-decimal algorithm OID.
@@ -50,6 +52,7 @@ impl From<&AlgorithmInfo> for AlgorithmSummary {
 /// Public-key description without key/SPKI bytes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct PublicKeySummary {
     /// Algorithm and parameter description.
@@ -67,6 +70,7 @@ pub struct PublicKeySummary {
 /// Extension summary without raw extnValue bytes; unsupported values remain explicit.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct ExtensionSummary {
     /// Dotted-decimal extension OID.
@@ -90,6 +94,7 @@ pub struct ExtensionSummary {
 /// for those. This summary is not a lossless certificate representation or trust verdict.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 pub struct CertificateSummary {
     /// Serialization contract major version, currently 1 (separate from crate SemVer).
