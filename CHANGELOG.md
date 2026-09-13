@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## 0.1.1
+
 - Documented supported certificate and report formats.
 - Added CI caching and explicit MSRV/stable toolchain jobs.
 - Simplified the ecosystem comparison.
