@@ -1,0 +1,23 @@
+[package]
+name = "canokey-x509"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+description = "Owned X.509 certificate inspection for CanoKey applications"
+publish = false
+
+[features]
+serde = ["dep:serde"]
+
+[dependencies]
+x509-parser = { version = "0.18.1", default-features = false }
+pem-rfc7468 = { version = "1", default-features = false, features = ["alloc"] }
+thiserror.workspace = true
+serde = { version = "1", features = ["derive"], optional = true }
+
+[dev-dependencies]
+serde_json = "1"

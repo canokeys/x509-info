@@ -1,0 +1,35 @@
+name: checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  rust:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable action revision
+        with:
+          toolchain: 1.85.1
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - run: cargo fmt --all --check
+      - run: cargo test --workspace --locked
+      - if: runner.os == 'Linux'
+        name: Build API documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo build --workspace --locked
+      - run: cargo build -p canokey --target wasm32-unknown-unknown --locked
+      - if: runner.os == 'Linux'
+        run: python3 scripts/check-dependencies.py
+      - if: runner.os != 'Windows'
+        run: bash scripts/test-c-abi.sh
+      - run: cargo run -p canokey --example probe --locked
+      - run: cargo run -p canokey --example read_certificate --locked
+      - if: runner.os != 'Windows'
+        run: bash scripts/run-c-example.sh

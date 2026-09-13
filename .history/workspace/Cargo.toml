@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/canokey-protocol",
+    "crates/canokey-compat",
+    "crates/canokey-admin",
+    "crates/canokey-piv",
+    "crates/canokey",
+    "crates/canokey-c",
+    "crates/canokey-x509",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+authors = ["canokeys.org"]
+license = "Apache-2.0"
+license-file = "LICENSE"
+homepage = "https://canokeys.org"
+
+[workspace.dependencies]
+zeroize = "1.8"
+thiserror = "2"
+canokey-protocol = { path = "crates/canokey-protocol" }
+canokey-compat = { path = "crates/canokey-compat" }
+canokey-admin = { path = "crates/canokey-admin" }
+canokey-piv = { path = "crates/canokey-piv" }
+canokey = { path = "crates/canokey" }
+canokey-x509 = { path = "crates/canokey-x509" }
