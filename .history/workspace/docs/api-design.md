@@ -125,8 +125,8 @@ PIV unwraps the certificate container; inspection is a separate pure function wi
 no operation handle, transport, clock, or application state.
 
 - DER/PEM parsers borrow input only during the call and return owned results/errors.
-  They accept exactly one bounded certificate and reject trailing data or mismatched
-  inner/outer signature identifiers.
+  They accept exactly one bounded certificate and reject trailing data. Inner/outer
+  signature identifiers are independent fields; no agreement policy is enforced.
 - The full result retains original encodings. The independent summary omits large
   certificate/key/signature/extension copies while retaining opaque name and policy
   values. See the [package contract](../crates/x509-info/README.md#summary-contract)
@@ -143,6 +143,9 @@ no operation handle, transport, clock, or application state.
   OID-specific opaque values are not automatically interpreted or validated.
 - Serde is optional; serializers and DTO layouts belong to callers. FRB maps owned
   fields directly without a JSON round trip. No result Deserialize contract exists.
+- The same package has an optional `cli` binary: `lib/` owns parsing and models;
+  `bin/` owns clap arguments, I/O, report adaptation and format serializers.
+  Enabling `serde` alone does not enable CLI dependencies.
 
 ## Planned Batch
 

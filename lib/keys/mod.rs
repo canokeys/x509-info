@@ -1,3 +1,5 @@
+pub(crate) mod public_key;
+
 use crate::{Error, OidNames};
 use pkcs1::der::Decode;
 use x509_parser::{asn1_rs::ToDer, x509::AlgorithmIdentifier};
@@ -127,7 +129,9 @@ pub(crate) fn inspect(
 pub(crate) fn rsa_bits(bytes: &[u8]) -> Option<usize> {
     let key = pkcs1::RsaPublicKey::from_der(bytes).ok()?;
     let modulus = key.modulus.as_bytes();
-    let first = modulus.iter().position(|b| *b != 0)?;
+    let Some(first) = modulus.iter().position(|b| *b != 0) else {
+        return Some(0);
+    };
     Some((modulus.len() - first) * 8 - modulus[first].leading_zeros() as usize)
 }
 

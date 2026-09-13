@@ -86,31 +86,25 @@ let info = canokey::x509::parse_der(certificate.der(), Default::default())?;
 let json = serde_json::to_string(&info.summary())?;
 ```
 
-Run a complete example using the bundled synthetic certificate or your own PEM/DER file:
+The [x509-info utility](crates/x509-info/bin/README.md) reads a file or stdin and
+prints every available field, including FIDO/Microsoft extensions, public-key
+components, SPKI fingerprints, decoded names/notices, and decoding diagnostics:
 
 ```sh
-cargo run -p canokey --features serde --example inspect_certificate --locked
-cargo run -p canokey --features serde --example inspect_certificate --locked -- certificate.pem
+cargo run -p x509-info --features cli --locked -- certificate.pem
+cargo run -p x509-info --features cli --locked -- certificate.pem --format json
+cargo run -p x509-info --features cli --locked -- certificate.pem --format der -o certificate.der
+cargo install --path crates/x509-info --features cli --locked
 ```
 
-`info.summary()` provides structured DN attributes, identities/usages/constraints,
-key identifiers, access/CRL locations, policies, algorithm details and a SHA-256
-fingerprint. Caller-owned OID tables can add or override presentation names.
-The summary JSON uses lowercase hex,
-Unix seconds and explicit unknown/malformed states, omitting large raw encodings.
-`CertificateInfo` retains original data. FRB adapters map owned values to application
-DTOs without a JSON round trip or global registry. Parsing establishes neither
-signature validity nor trust; PIV certificate unwrapping remains a separate operation.
-
-See the [x509-info README](crates/x509-info/README.md) for the schema, supported
-algorithms, limitations and standalone `details`, `export_json` and `binding_dto`
-examples, plus `export_formats` for CBOR and caller-defined TOML output. Serializers
-are application choices and remain dev-dependencies. The examples run independently
-of the CanoKey facade and import no backend types.
+The [library README](crates/x509-info/README.md) owns field/Serde contracts and
+backend limits. The CLI replaces the details/export examples; the executable
+`binding_dto` example retains the Rust/Dart ownership boundary. The CLI owns I/O
+and format serializers; core dependencies stay free of transports and runtimes.
 
 ## Rust API documentation
 
-All seven crates document public types, fields, methods and factories in rustdoc, including ownership, byte formats, lifecycle errors, and FFI safety. Start with the facade's quick start, then follow its `piv` and `compatibility` re-exports. The low-level operation documentation includes a complete caller-driven exchange example.
+All library crates document public types, fields, methods and factories in rustdoc, including ownership, byte formats, lifecycle errors, and FFI safety. Start with the facade's quick start, then follow its `piv` and `compatibility` re-exports. The low-level operation documentation includes a complete caller-driven exchange example.
 
 ```sh
 cargo doc --workspace --no-deps --locked --open

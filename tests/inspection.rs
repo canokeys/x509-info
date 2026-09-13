@@ -136,15 +136,14 @@ fn unknown_key_algorithm_does_not_invent_algorithm_size() {
 }
 
 #[test]
-fn rejects_mismatched_inner_and_outer_signature_algorithms() {
+fn preserves_mismatched_inner_and_outer_signature_algorithms() {
     let mut der = parse_pem(PEM, ParseOptions::default()).unwrap().der;
     let oid = [6, 8, 0x2a, 0x86, 0x48, 0xce, 0x3d, 4, 3, 2];
     let offset = der.windows(oid.len()).rposition(|w| w == oid).unwrap();
     der[offset + oid.len() - 1] = 3;
-    assert_eq!(
-        parse_der(&der, ParseOptions::default()).unwrap_err(),
-        Error::InconsistentSignatureAlgorithm
-    );
+    let info = parse_der(&der, ParseOptions::default()).unwrap();
+    assert_eq!(info.signature_algorithm.oid, "1.2.840.10045.4.3.3");
+    assert_eq!(info.tbs_signature_algorithm.oid, "1.2.840.10045.4.3.2");
 }
 
 #[cfg(feature = "serde")]

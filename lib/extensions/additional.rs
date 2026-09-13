@@ -84,7 +84,7 @@ pub struct NetscapeCertificateType {
 
 pub(crate) fn decode(oid: &str, bytes: &[u8], names: &OidNames) -> Option<E> {
     Some(match oid {
-        "2.5.29.30" => E::NameConstraints(crate::constraints::decode(bytes, names)?),
+        "2.5.29.30" => E::NameConstraints(crate::extensions::constraints::decode(bytes, names)?),
         "2.5.29.36" => {
             let p = pkix::PolicyConstraints::from_der(bytes).ok()?;
             if p.require_explicit_policy.is_none() && p.inhibit_policy_mapping.is_none() {
@@ -197,7 +197,7 @@ pub(crate) fn decode(oid: &str, bytes: &[u8], names: &OidNames) -> Option<E> {
             })
         }
         "1.3.6.1.4.1.11129.2.4.2" => {
-            E::SignedCertificateTimestamps(crate::transparency::decode(bytes)?)
+            E::SignedCertificateTimestamps(crate::extensions::transparency::decode(bytes)?)
         }
         _ => E::Unsupported,
     })

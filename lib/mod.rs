@@ -35,36 +35,38 @@
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
-mod additional;
-#[cfg(test)]
-mod additional_tests;
-mod algorithms;
-mod constraints;
+mod decoding;
 mod extensions;
-mod locations;
+mod keys;
 mod names;
 mod oids;
-mod policies;
 mod summary;
-mod transparency;
+#[cfg(test)]
+mod tests;
 
-pub use additional::{
+pub use decoding::{DecodeDiagnostic, DecodeIssue, IntegerValue};
+pub use extensions::additional::{
     DirectoryAttribute, NetscapeCertificateType, PolicyConstraints, PolicyMapping,
     PrivateKeyUsagePeriod,
 };
-pub use algorithms::{AlgorithmInfo, KeyDataStatus, ParameterStatus, PssParameters};
-pub use constraints::{ConstraintName, GeneralSubtree, NameConstraints};
-pub use extensions::{ExtensionDetails, ExtensionInfo, GeneralName, KeyPurpose, KeyUsage};
-pub use locations::{
+pub use extensions::constraints::{ConstraintName, GeneralSubtree, NameConstraints};
+pub use extensions::device::{CertificateTemplate, FidoTransports};
+pub use extensions::locations::{
     AccessDescription, AuthorityKeyIdentifier, DistributionPoint, DistributionPointName,
 };
+pub use extensions::policies::{
+    CertificatePolicy, NoticeReference, PolicyQualifier, PolicyQualifierDetails, UserNotice,
+};
+pub use extensions::transparency::{SctEntry, SignedCertificateTimestamp};
+pub use extensions::{ExtensionDetails, ExtensionInfo, GeneralName, KeyPurpose, KeyUsage};
+pub use keys::public_key::PublicKeyDetails;
+pub use keys::{AlgorithmInfo, KeyDataStatus, ParameterStatus, PssParameters};
+pub use names::details::NameDetails;
 pub use names::{DistinguishedName, NameAttribute};
 pub use oids::{InvalidOid, OidNames};
-pub use policies::{CertificatePolicy, PolicyQualifier, PolicyQualifierDetails};
 pub use summary::{
     AlgorithmSummary, CertificateSummary, ExtensionSummary, NameSummary, PublicKeySummary,
 };
-pub use transparency::{SctEntry, SignedCertificateTimestamp};
 
 use sha2::{Digest, Sha256};
 use x509_parser::nom::Parser;
@@ -114,7 +116,7 @@ pub enum Error {
     /// Bytes follow the single DER certificate.
     #[error("trailing data after certificate")]
     TrailingData,
-    /// Inner and outer signature algorithm identifiers disagree.
+    /// Legacy error retained for compatibility; parsing now preserves both identifiers.
     #[error("certificate signature algorithm identifiers disagree")]
     InconsistentSignatureAlgorithm,
 }
@@ -172,6 +174,8 @@ pub struct PublicKeyInfo {
 pub struct CertificateInfo {
     /// Outer signature algorithm with decoded parameters where supported.
     pub signature_algorithm: AlgorithmInfo,
+    /// Signature algorithm from TBSCertificate, retained independently of the outer field.
+    pub tbs_signature_algorithm: AlgorithmInfo,
     /// Complete certificate DER, with no trailing object metadata or other certificate.
     pub der: Vec<u8>,
     /// One-based X.509 version (1, 2 or 3 for standard versions).
@@ -220,7 +224,7 @@ fn check_limit(bytes: &[u8], options: ParseOptions) -> Result<(), Error> {
 /// # Errors
 /// Returns InvalidOptions for a zero budget, LimitExceeded before parsing an
 /// oversized input, InvalidCertificate for decoding failures, TrailingData if any
-/// bytes follow the certificate, or InconsistentSignatureAlgorithm on disagreement.
+/// bytes follow the certificate. Inner/outer signature algorithms are retained independently.
 /// Syntactic parsing does not verify signatures, key points, extensions or trust.
 pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo, Error> {
     check_limit(bytes, options)?;
@@ -246,9 +250,6 @@ pub fn parse_der_with_names(
     if !rest.is_empty() {
         return Err(Error::TrailingData);
     }
-    if cert.signature_algorithm != cert.tbs_certificate.signature {
-        return Err(Error::InconsistentSignatureAlgorithm);
-    }
     let spki = cert.public_key();
     let encoded_key_bits = spki
         .subject_public_key
@@ -271,7 +272,7 @@ pub fn parse_der_with_names(
     } else {
         None
     };
-    let (key_size_bits, key_data_status) = algorithms::key_details(
+    let (key_size_bits, key_data_status) = keys::key_details(
         &algorithm_oid,
         curve_oid.as_deref(),
         &spki.subject_public_key.data,
@@ -282,7 +283,8 @@ pub fn parse_der_with_names(
         *counts.entry(extension.oid.to_id_string()).or_insert(0usize) += 1;
     }
     Ok(CertificateInfo {
-        signature_algorithm: algorithms::inspect(&cert.signature_algorithm, true, names)?,
+        signature_algorithm: keys::inspect(&cert.signature_algorithm, true, names)?,
+        tbs_signature_algorithm: keys::inspect(&cert.tbs_certificate.signature, true, names)?,
         der: bytes.to_vec(),
         version: cert
             .version()
@@ -299,7 +301,7 @@ pub fn parse_der_with_names(
         signature_value: cert.signature_value.data.to_vec(),
         signature_unused_bits: cert.signature_value.unused_bits,
         public_key: PublicKeyInfo {
-            algorithm: algorithms::inspect(&spki.algorithm, false, names)?,
+            algorithm: keys::inspect(&spki.algorithm, false, names)?,
             curve_name: curve_oid
                 .as_deref()
                 .and_then(|oid| names.get(oid))

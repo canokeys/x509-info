@@ -1,3 +1,5 @@
+pub(crate) mod details;
+
 use crate::OidNames;
 use x509_parser::x509::{AttributeTypeAndValue, X509Name};
 
@@ -10,7 +12,7 @@ pub struct NameAttribute {
     pub oid: String,
     /// Common attribute label, when recognized (for example CN or O).
     pub label: Option<String>,
-    /// Decoded UTF-8/Printable/Numeric/IA5 text, or None for other/invalid encodings.
+    /// Decoded UTF-8/Printable/Numeric/IA5/Visible/BMP/Universal text, or None.
     /// No lossy decoding is used. Raw value content remains available in value_hex.
     pub value: Option<String>,
     /// ASN.1 tag number of the value; the complete Name DER preserves its header.
@@ -40,7 +42,7 @@ pub(crate) fn inspect_attribute(
     NameAttribute {
         label: names.get(&oid).map(str::to_owned),
         oid,
-        value: attr.as_str().ok().map(str::to_owned),
+        value: crate::decoding::text(attr.attr_value()).ok(),
         value_tag: attr.attr_value().tag().0,
         value_hex: hex::encode(attr.as_slice()),
     }
@@ -54,6 +56,22 @@ pub(crate) fn inspect_name(name: &X509Name<'_>, names: &OidNames) -> Distinguish
             .iter_rdn()
             .map(|rdn| rdn.iter().map(|a| inspect_attribute(a, names)).collect())
             .collect(),
+    }
+}
+
+impl NameAttribute {
+    /// Explain missing text by re-decoding the retained tag/content. No name policy runs.
+    /// Returns None when text is decodable, including for a mutated public field.
+    pub fn diagnostic(&self) -> Option<crate::DecodeDiagnostic> {
+        let bytes = match hex::decode(&self.value_hex) {
+            Ok(b) => b,
+            Err(_) => return Some(crate::DecodeDiagnostic::invalid("name value hex")),
+        };
+        let any = x509_parser::asn1_rs::Any::from_tag_and_data(
+            x509_parser::asn1_rs::Tag(self.value_tag),
+            &bytes,
+        );
+        crate::decoding::text(&any).err()
     }
 }
 

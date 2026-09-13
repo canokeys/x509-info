@@ -39,5 +39,5 @@ key was saved. The relative-name encoding is a regression fixture for a backend
 that otherwise reports that field as absent.
 
 `policies.pem` (50), generated the same way, includes anyPolicy plus a private
-policy with CPS URI and UserNotice. The notice remains raw/unparsed; tests verify
-that its bytes survive inspection and generic serialization.
+policy with CPS URI and UserNotice. The notice is decoded into organization/numbers/text while its complete raw value
+remains available; tests cover both representations.

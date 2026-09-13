@@ -1,5 +1,6 @@
 use crate::{
-    additional::decode, ConstraintName, ExtensionDetails as E, GeneralName, OidNames, SctEntry,
+    extensions::additional::decode, ConstraintName, ExtensionDetails as E, GeneralName, OidNames,
+    SctEntry,
 };
 
 fn tlv(tag: u8, content: &[u8]) -> Vec<u8> {
@@ -280,7 +281,7 @@ fn public_certificate_results_keep_added_extensions_raw_data_and_duplicates() {
         Any, Decode, Encode, Tag, TagNumber, Tagged,
     };
     let info = crate::parse_pem(
-        include_bytes!("../tests/fixtures/details.pem"),
+        include_bytes!("../../tests/fixtures/details.pem"),
         crate::ParseOptions::default(),
     )
     .unwrap();

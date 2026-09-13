@@ -166,7 +166,10 @@ fn policies_preserve_unknown_ids_cps_uris_and_unparsed_notices() {
         policies[1].qualifiers[0].details,
         Q::CpsUri("https://policy.example.invalid/cps".into())
     );
-    assert_eq!(policies[1].qualifiers[1].details, Q::Unparsed);
+    let Q::UserNotice(notice) = &policies[1].qualifiers[1].details else {
+        panic!("notice")
+    };
+    assert_eq!(notice.explicit_text.as_deref(), Some("Example notice"));
     assert!(policies[1].qualifiers[1]
         .value_der_hex
         .contains("4578616d706c65206e6f74696365"));

@@ -209,5 +209,11 @@
         "kind": "unsupported"
       }
     }
-  ]
+  ],
+  "tbs_signature_algorithm": {
+    "oid": "1.2.840.10045.4.3.2",
+    "name": "ECDSA-SHA256",
+    "parameter_status": "absent",
+    "pss": null
+  }
 }

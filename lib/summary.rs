@@ -108,6 +108,8 @@ pub struct CertificateSummary {
     pub sha256_fingerprint_hex: String,
     /// Signature algorithm description.
     pub signature_algorithm: AlgorithmSummary,
+    /// Inner signature algorithm, independently of the outer certificate field.
+    pub tbs_signature_algorithm: AlgorithmSummary,
     /// Public-key description.
     pub public_key: PublicKeySummary,
     /// Extensions in encoded order, including unsupported/malformed/duplicate entries.
@@ -129,6 +131,7 @@ impl CertificateInfo {
             serial_number_hex: hex::encode(&self.serial_number),
             sha256_fingerprint_hex: hex::encode(self.sha256_fingerprint()),
             signature_algorithm: (&self.signature_algorithm).into(),
+            tbs_signature_algorithm: (&self.tbs_signature_algorithm).into(),
             public_key: PublicKeySummary {
                 algorithm: (&self.public_key.algorithm).into(),
                 key_data_status: self.public_key.key_data_status,

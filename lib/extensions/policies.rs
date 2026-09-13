@@ -17,7 +17,7 @@ pub struct CertificatePolicy {
     pub qualifiers: Vec<PolicyQualifier>,
 }
 
-/// Interpretation of a policy qualifier; currently only CPS URI is projected.
+/// Interpretation of a policy qualifier, without policy evaluation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(
@@ -28,9 +28,11 @@ pub struct CertificatePolicy {
 pub enum PolicyQualifierDetails {
     /// CPS URI text. It is not validated as a URL and is never fetched.
     CpsUri(String),
-    /// Unknown qualifier or an unimplemented form such as UserNotice; raw DER remains.
+    /// Structured notice text/reference; no policy compliance is inferred.
+    UserNotice(UserNotice),
+    /// Unknown qualifier; raw DER remains.
     Unparsed,
-    /// A CPS qualifier was present but could not be decoded as IA5String.
+    /// A known qualifier could not be decoded within the supported representation.
     Malformed,
 }
 
@@ -44,7 +46,7 @@ pub struct PolicyQualifier {
     /// Complete qualifier value DER in lowercase hex, including tag/length.
     /// Retained in summaries too so unparsed notices/private qualifiers remain useful.
     pub value_der_hex: String,
-    /// Decoded CPS URI or an explicit unparsed/malformed state.
+    /// Decoded URI/notice or an explicit unparsed/malformed state.
     pub details: PolicyQualifierDetails,
 }
 
@@ -69,6 +71,11 @@ pub(crate) fn decode(bytes: &[u8], names: &OidNames) -> Option<Vec<CertificatePo
                         let details = if oid == "1.3.6.1.5.5.7.2.1" {
                             match Ia5String::from_der(&value) {
                                 Ok(s) => PolicyQualifierDetails::CpsUri(s.as_str().into()),
+                                Err(_) => PolicyQualifierDetails::Malformed,
+                            }
+                        } else if oid == "1.3.6.1.5.5.7.2.2" {
+                            match notice(&value) {
+                                Ok(n) => PolicyQualifierDetails::UserNotice(n),
                                 Err(_) => PolicyQualifierDetails::Malformed,
                             }
                         } else {
@@ -119,5 +126,97 @@ mod tests {
             0x30, 19, 0x30, 17, 6, 1, 42, 0x30, 12, 0x30, 10, 6, 8, 43, 6, 1, 5, 5, 7, 2, 1,
         ];
         assert!(decode(&missing, &names).is_none());
+    }
+}
+
+/// Certificate-policy notice, preserving optional fields without display policy.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
+pub struct UserNotice {
+    /// Organization and notice numbers, when encoded.
+    pub notice_reference: Option<NoticeReference>,
+    /// Explicit notice text, without sanitization or display-length enforcement.
+    pub explicit_text: Option<String>,
+}
+/// Organization and referenced notice numbers; numbers are not range-checked.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
+pub struct NoticeReference {
+    /// Decoded DisplayText organization string.
+    pub organization: String,
+    /// INTEGER values in encoded order, including negatives, repeats and large values.
+    pub notice_numbers: Vec<crate::IntegerValue>,
+}
+fn notice(bytes: &[u8]) -> Result<UserNotice, crate::DecodeDiagnostic> {
+    use crate::decoding::{any, children, integer, text};
+    use x509_parser::asn1_rs::{Any, Tag};
+    fn display(value: &Any<'_>) -> Result<String, crate::DecodeDiagnostic> {
+        if !matches!(
+            value.tag(),
+            Tag::Ia5String | Tag::VisibleString | Tag::BmpString | Tag::Utf8String
+        ) {
+            return Err(crate::DecodeDiagnostic::new(
+                crate::DecodeIssue::UnsupportedEncoding,
+                "DisplayText choice",
+            ));
+        }
+        text(value)
+    }
+    // x509-cert 0.3 models noticeRef as GeneralizedTime and omits two DisplayText
+    // choices. Reuse generic ASN.1 decoding here to follow the actual RFC 5280 schema.
+    let fields = children(&any(bytes)?, Tag::Sequence)?;
+    let mut index = 0;
+    let notice_reference = if fields.first().is_some_and(|f| f.tag() == Tag::Sequence) {
+        let parts = children(&fields[0], Tag::Sequence)?;
+        if parts.len() != 2 {
+            return Err(crate::DecodeDiagnostic::invalid("NoticeReference fields"));
+        }
+        let organization = display(&parts[0])?;
+        let notice_numbers = children(&parts[1], Tag::Sequence)?
+            .iter()
+            .map(integer)
+            .collect::<Result<Vec<_>, _>>()?;
+        index += 1;
+        Some(NoticeReference {
+            organization,
+            notice_numbers,
+        })
+    } else {
+        None
+    };
+    let explicit_text = fields.get(index).map(display).transpose()?;
+    if explicit_text.is_some() {
+        index += 1;
+    }
+    if index != fields.len() {
+        return Err(crate::DecodeDiagnostic::invalid(
+            "UserNotice trailing fields",
+        ));
+    }
+    Ok(UserNotice {
+        notice_reference,
+        explicit_text,
+    })
+}
+impl PolicyQualifier {
+    /// Explain a known qualifier's decoding failure using its retained value DER.
+    /// Unknown qualifier OIDs are reported as UnknownType, never guessed.
+    pub fn diagnostic(&self) -> Option<crate::DecodeDiagnostic> {
+        let bytes = match hex::decode(&self.value_der_hex) {
+            Ok(b) => b,
+            Err(_) => return Some(crate::DecodeDiagnostic::invalid("qualifier hex")),
+        };
+        match self.oid.as_str() {
+            "1.3.6.1.5.5.7.2.2" => notice(&bytes).err(),
+            "1.3.6.1.5.5.7.2.1" => Ia5String::from_der(&bytes)
+                .err()
+                .map(|e| crate::decoding::der_error(e, "CPS URI")),
+            _ => Some(crate::DecodeDiagnostic::new(
+                crate::DecodeIssue::UnknownType,
+                "policy qualifier",
+            )),
+        }
     }
 }

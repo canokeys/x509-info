@@ -44,11 +44,13 @@ optional `canokey::x509` facade re-exports this crate; no CanoKey crate is a dep
 - SAN/IAN (DNS, email, IP, URI, directory name, registered ID, OtherName, opaque
   X.400/EDI names), KU, EKU and Basic Constraints.
 - SKI/AKI, AIA/SIA access methods and locations, CRL Distribution Points and Freshest CRL.
-- Certificate Policies with CPS URIs and preserved UserNotice/private qualifier encodings.
+- Certificate Policies with CPS URIs, structured UserNotice and retained qualifier encodings.
 - Name Constraints, Policy Constraints/Mappings and Inhibit Any Policy.
 - Private Key Usage Period and multi-valued Subject Directory Attributes.
 - TLS Feature numbers, OCSP no-check, CT poison and embedded SCT lists.
 - Netscape certificate-type flags and comments.
+- FIDO AAGUID/transport bits and Microsoft template name/OID/version fields.
+- RSA components, SEC1 coordinates/compressed points, Ed/Montgomery encodings and SPKI SHA-256.
 - Raw certificate/name/SPKI/signature/extension data, unknown OIDs and duplicate extension flags.
 
 Unsupported extensions stay `Unsupported`; failed supported extension decoding stays
@@ -61,7 +63,8 @@ limits); it is not a comprehensive certificate-validity verdict. A malformed sup
 is distinct from an unrecognized algorithm/curve. These findings are not trust decisions.
 
 The parser accepts exactly one bounded DER/PEM certificate (default 1 MiB encoded
-input), rejects trailing objects and mismatched inner/outer signature identifiers.
+input) and rejects trailing objects. Inner/outer signature identifiers are retained
+independently; disagreement does not cause a parse failure.
 The input budget is not an exact peak-memory bound: full results and summaries own
 copies. Parsing does not verify signatures, chains, identities, revocation, critical
 extension policy or mathematical key validity. `validity.contains(timestamp)` only
@@ -97,7 +100,42 @@ SCT list, entry, and DER lengths must be consumed exactly. Unknown SCT versions
 remain opaque, and unknown v1 algorithm numbers remain numeric. No CT log lookup,
 signature verification, TLS enforcement, name matching, or policy-path processing
 occurs. CRL/CRL-entry extensions require a separate CRL inspection API and remain
-uninterpreted here. UserNotice/private qualifiers retain their existing raw form.
+uninterpreted here. UserNotice also exposes organization, ordered INTEGER notice
+numbers and explicit text; unknown qualifiers retain their raw form.
+
+## Device identifiers and additional field accessors
+
+FIDO AAGUID (`1.3.6.1.4.1.45724.1.1.4`) retains OCTET STRING bytes in hex, even when
+the length differs from the FIDO profile. U2F transports (`1.3.6.1.4.1.45724.2.1.1`)
+expose Bluetooth Classic/LE, USB, NFC, internal and unknown set bits. No device or
+attestation-profile matching occurs. Microsoft template name (`1.3.6.1.4.1.311.20.2`)
+is BMP text; template information (`1.3.6.1.4.1.311.21.7`) retains its OID and
+optional version INTEGERs. `IntegerValue` preserves signed content and supplies
+an optional i64 value without rejecting larger numbers.
+
+- `GeneralName::details()` decodes UPN, HardwareModuleName, DNS SRV, XMPP and EDI
+  fields from retained bytes. Unknown OtherName OIDs return None. Raw encodings
+  remain unchanged; this optional accessor never caches results.
+- DN values decode UTF8, Printable, Numeric, IA5, Visible, BMP and Universal strings.
+  `DirectoryAttribute::text_values()` provides the same decoding per value. No
+  ambiguous Teletex character-set interpretation is guessed by this text helper.
+- UserNotice follows the RFC 5280 schema using generic dependency ASN.1 decoders:
+  the current x509-cert UserNotice type has an incorrect noticeRef type and partial
+  DisplayText coverage. This adapter supports all four DisplayText encodings and
+  preserves signed, duplicate, and large notice numbers without display policy.
+- `PublicKeyInfo::details()` extracts RSA modulus/exponent, SEC1 x/y or compressed
+  x/parity, and RFC 8410 encoded keys. It performs no primality, curve arithmetic,
+  decompression or strength check. `spki_sha256_fingerprint()` hashes the original
+  complete SPKI encoding, including parameters.
+- `NameAttribute::diagnostic()`, `PolicyQualifier::diagnostic()` and
+  `ExtensionInfo::diagnostic()` expose typed decoding causes where available.
+  `Unclassified` explicitly preserves uncertainty from older backend paths.
+  Existing Malformed/Unsupported states are retained for compatibility.
+
+See [RFC 5280](https://www.rfc-editor.org/rfc/rfc5280.html),
+[RFC 4108](https://www.rfc-editor.org/rfc/rfc4108.html),
+[WebAuthn attestation](https://www.w3.org/TR/webauthn-3/#sctn-packed-attestation),
+and [Microsoft template fields](https://learn.microsoft.com/en-us/windows/win32/seccertenroll/cx509extensiontemplate).
 
 ## OID names and caller customization
 
@@ -149,12 +187,12 @@ for SHA-3 and ML-DSA names. The registry snapshot and crate version determine la
 
 All nine backend name choices have dedicated owned variants. `OtherName` retains
 its type OID, optional caller label, and hex-encoded bytes following the OID,
-including the expected explicit [0] value wrapper. The backend extracts the OID
-but does not validate that wrapper or decode OID-specific values.
+including the expected explicit [0] value wrapper. The initial projection extracts the OID; `details()` optionally decodes supported
+OID-specific values and checks their wrappers.
 
 `X400Address` and `EdiPartyName` retain the constructed bit and content octets in
-lowercase hex. These are opaque values: `x509-parser` itself does not decode their
-inner fields. The outer context tags are [3] and [5]; exact original extension
+lowercase hex. EDI fields are available through `details()` using RustCrypto;
+X.400 internals remain unparsed. The outer context tags are [3] and [5]; exact original extension
 encoding remains in `ExtensionInfo::value_der`. Invalid names and invalid IP
 lengths retain the existing `Malformed(tag)` finding. `Unsupported(tag)` remains
 available for compatibility but is not emitted for the current backend choices.
@@ -170,8 +208,7 @@ kinds allowed by schema version 1. Existing variants keep their representation.
 has `schema_version: 1`. It omits full DER, raw key/signature/parameter/extension bytes.
 Keep `CertificateInfo` when the application needs those encodings. Policy qualifier
 value DER, opaque GeneralName contents, directory-attribute values, and SCT
-byte fields remain as hex in the summary so uninterpreted values are not discarded. Only CPS URI has a decoded policy qualifier
-variant. Full-result Serde
+byte fields remain as hex in the summary so uninterpreted values are not discarded. CPS URI and UserNotice have decoded policy qualifier variants. Full-result Serde
 is also available, but is a diagnostic representation tied to crate SemVer, not the
 versioned summary contract.
 
@@ -185,7 +222,7 @@ versioned summary contract.
   Consumers must tolerate additional fields and unknown kinds/statuses. Incompatible
   representation changes require a new schema major. JSON object order is not a contract.
 - Names/labels are presentation conveniences; do not compare identities by display
-  strings. UTF8/Printable/Numeric/IA5 values are decoded; other string encodings retain
+  strings. UTF8/Printable/Numeric/IA5/Visible/BMP/Universal values are decoded; other encodings retain
   raw content with `value: null`. No Unicode or DN normalization is performed.
 
 Public-key sizes are modulus/nominal curve sizes, never security-strength estimates.
@@ -204,38 +241,30 @@ tested against the same data model as JSON, including nulls, enum tags, location
 and policies. The summary's hex strings remain strings in CBOR; use an application
 DTO/newtype if a different byte representation is required.
 
-TOML cannot represent arbitrary nulls, so the `export_formats` example uses a small
-application-owned inventory DTO with selected/renamed fields and omitted None
-values. The same approach supports custom JSON, CSV records or schema-based formats.
-A caller cannot implement an external trait on an external result type directly
-because of Rust's orphan rules; define a local DTO or newtype instead.
+TOML has no null and cannot represent every u64. The CLI documents its omission
+and decimal-string conventions. Applications can instead use their own DTO/newtype
+for a different schema; serializers remain outside the library's normal dependencies.
+No `Deserialize` is provided for certificate results. Import certificates through
+DER/PEM parsing; report deserialization does not reconstruct a trusted certificate.
 
-No `Deserialize` implementation is promised for certificate results. The format
-tests deserialize into application/generic value types, not trusted certificates.
-Import actual certificates through DER/PEM parsing. `ciborium`, `toml` and
-`serde_json` are dev-dependencies for examples/tests only, not normal library
-features or runtime requirements.
+## Command-line utility and binding example
 
-## Executable examples
-
-Run from the repository root:
+The [x509-info binary](bin/README.md) replaces the details and export
+examples. It supports text, JSON, CBOR, TOML and DER/PEM conversion, file/stdin
+input, bounded reads, and file/stdout output. Reports include the additional
+name/key accessors and available diagnostics as well as the core result fields.
 
 ```sh
-cargo run -p x509-info --example details --locked
-cargo run -p x509-info --features serde --example export_json --locked
-cargo run -p x509-info --features serde --example export_json --locked -- certificate.pem
+cargo run -p x509-info --features cli --locked -- certificate.pem --format json
+cargo run -p x509-info --features cli --locked -- certificate.pem --format toml --summary
+cargo run -p x509-info --features cli --locked -- certificate.der --format pem -o certificate.pem
 cargo run -p x509-info --example binding_dto --locked
-cargo run -p x509-info --features serde --example export_formats --locked
 ```
 
-`details` displays common information; `export_json` owns bounded file reads and JSON
-output. Both use only the public model, with no backend parser imports. `binding_dto`
-shows a Console-style Rust adapter owning its input and returning application DTOs
-that outlive all parser data. Both it and `export_json` use `CertificateSummary`
-after explicitly dropping the input, OID configuration, and full certificate
-result. An actual FRB integration exposes the adapter DTOs to Dart and maps typed errors in that binding crate. Dart owns the returned values;
-no Rust registry, handle lifecycle or JSON round trip is required. FRB itself stays
-outside this crate.
+The binding example returns a Console-style application DTO after dropping the
+input, OID configuration, and full certificate result. Actual FRB adapters expose
+DTOs and typed errors; Dart owns the values with no JSON round trip or Rust handle
+registry. FRB remains outside this crate.
 
 ## Dependencies and support
 
@@ -252,3 +281,32 @@ within the workspace and remains unpublished pending evidence from consumer usag
 
 Original code is Apache-2.0, authored by canokeys.org. The packaged LICENSE covers
 original code; LICENSE.console retains the MIT notice for adapted Console code.
+
+
+## Source layout and features
+
+The package contains a library and an optional binary. Cargo explicitly selects
+their entry points; public library types remain re-exported from the crate root.
+
+```text
+lib/
+  mod.rs          Certificate model, parsing entry points, public re-exports
+  decoding.rs     Shared encoding helpers and diagnostics
+  oids.rs         OID names and caller-owned overrides
+  summary.rs      Owned summary and serialization contract
+  names/          Distinguished names and GeneralName details
+  keys/           Algorithms, parameters and public-key fields
+  extensions/     Standard, device, policy and transparency extensions
+  tests/          Internal decoder tests
+bin/
+  main.rs         clap arguments, bounded input and output
+  report.rs       Report enrichment and text/JSON/CBOR/TOML rendering
+  README.md       Command-line usage
+tests/            Integration tests and certificate fixtures
+examples/         Binding DTO example
+```
+
+Default features build only the library. `serde` adds serialization of owned
+types; `cli` enables `serde`, clap and the binary's format serializers. Library
+consumers and the CanoKey facade do not enable `cli`. The binary uses only public
+library APIs; ASN.1 interpretation belongs in `lib/`.

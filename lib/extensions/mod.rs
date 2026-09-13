@@ -1,3 +1,10 @@
+pub(crate) mod additional;
+pub(crate) mod constraints;
+pub(crate) mod device;
+pub(crate) mod locations;
+pub(crate) mod policies;
+pub(crate) mod transparency;
+
 use crate::names::inspect_name;
 use crate::{
     AccessDescription, AuthorityKeyIdentifier, DistributionPoint, NameAttribute, OidNames,
@@ -163,6 +170,14 @@ pub enum ExtensionDetails {
     NetscapeCertificateType(crate::NetscapeCertificateType),
     /// Legacy Netscape IA5 comment text, not sanitized markup.
     NetscapeComment(String),
+    /// FIDO AAGUID OCTET STRING in lowercase hex. No length/profile/device matching.
+    FidoAaguid(String),
+    /// FIDO U2F transport bits, including unknown set bits.
+    FidoTransports(crate::FidoTransports),
+    /// Microsoft legacy template name, decoded from BMPString.
+    MicrosoftTemplateName(String),
+    /// Microsoft certificate-template OID and optional version INTEGERs.
+    MicrosoftCertificateTemplate(crate::CertificateTemplate),
     /// This library does not interpret this OID. Raw bytes remain available.
     Unsupported,
     /// A supported extension could not be decoded within this library's limits.
@@ -236,6 +251,9 @@ pub(crate) fn decode_with_names(oid: &str, bytes: &[u8], names: &OidNames) -> Ex
 }
 
 fn decode_supported(oid: &str, bytes: &[u8], names: &OidNames) -> Option<ExtensionDetails> {
+    if let Some(value) = crate::extensions::device::decode(oid, bytes).ok()? {
+        return Some(value);
+    }
     match oid {
         "2.5.29.17" | "2.5.29.18" => {
             let (rest, san) = backend::SubjectAlternativeName::from_der(bytes).ok()?;
@@ -339,7 +357,7 @@ fn decode_supported(oid: &str, bytes: &[u8], names: &OidNames) -> Option<Extensi
                 return None;
             }
             Some(ExtensionDetails::AuthorityInfoAccess(
-                crate::locations::access(&aia.accessdescs, names),
+                crate::extensions::locations::access(&aia.accessdescs, names),
             ))
         }
         "1.3.6.1.5.5.7.1.11" => {
@@ -349,11 +367,11 @@ fn decode_supported(oid: &str, bytes: &[u8], names: &OidNames) -> Option<Extensi
                 return None;
             }
             Some(ExtensionDetails::SubjectInfoAccess(
-                crate::locations::access(&sia.accessdescs, names),
+                crate::extensions::locations::access(&sia.accessdescs, names),
             ))
         }
         "2.5.29.31" | "2.5.29.46" => {
-            let points = crate::locations::distribution(bytes, names)?;
+            let points = crate::extensions::locations::distribution(bytes, names)?;
             Some(if oid == "2.5.29.31" {
                 ExtensionDetails::CrlDistributionPoints(points)
             } else {
@@ -361,9 +379,9 @@ fn decode_supported(oid: &str, bytes: &[u8], names: &OidNames) -> Option<Extensi
             })
         }
         "2.5.29.32" => Some(ExtensionDetails::CertificatePolicies(
-            crate::policies::decode(bytes, names)?,
+            crate::extensions::policies::decode(bytes, names)?,
         )),
-        _ => crate::additional::decode(oid, bytes, names),
+        _ => crate::extensions::additional::decode(oid, bytes, names),
     }
 }
 

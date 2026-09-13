@@ -16,7 +16,7 @@ fn certificate_view(pem: Vec<u8>) -> Result<CertificateView, x509_info::Error> {
     drop(pem);
     drop(names);
     let summary = info.summary();
-    // The same summary model also serves the export_json example.
+    // The command-line utility uses this same summary model for reports.
     drop(info);
 
     // UI policy belongs here: this view only needs DNS identities. A complete
