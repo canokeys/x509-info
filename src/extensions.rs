@@ -138,6 +138,31 @@ pub enum ExtensionDetails {
     FreshestCrl(Vec<DistributionPoint>),
     /// Certificate policy OIDs and qualifiers; no policy evaluation is performed.
     CertificatePolicies(Vec<crate::CertificatePolicy>),
+    /// Permitted/excluded name subtrees; no name matching or policy evaluation.
+    NameConstraints(crate::NameConstraints),
+    /// Explicit-policy and policy-mapping counters.
+    PolicyConstraints(crate::PolicyConstraints),
+    /// Issuer/subject policy pairs in encoded order, including duplicates.
+    PolicyMappings(Vec<crate::PolicyMapping>),
+    /// Number of additional certificates before anyPolicy is inhibited.
+    InhibitAnyPolicy(u32),
+    /// Private-key usage bounds, independent of certificate validity.
+    PrivateKeyUsagePeriod(crate::PrivateKeyUsagePeriod),
+    /// Multi-valued subject directory attributes with complete value encodings.
+    SubjectDirectoryAttributes(Vec<crate::DirectoryAttribute>),
+    /// RFC 7633 TLS feature numbers in encoded order, including unknowns/duplicates.
+    /// 5 is status_request and 17 is status_request_v2; no TLS policy is enforced.
+    TlsFeatures(Vec<u16>),
+    /// OCSP no-check marker; does not disable validation in this library or callers.
+    OcspNoCheck,
+    /// Certificate Transparency precertificate poison marker; not an acceptance verdict.
+    CtPoison,
+    /// Embedded SCT entries; signatures and log membership are not verified.
+    SignedCertificateTimestamps(Vec<crate::SctEntry>),
+    /// Legacy Netscape certificate-type flags.
+    NetscapeCertificateType(crate::NetscapeCertificateType),
+    /// Legacy Netscape IA5 comment text, not sanitized markup.
+    NetscapeComment(String),
     /// This library does not interpret this OID. Raw bytes remain available.
     Unsupported,
     /// A supported extension could not be decoded within this library's limits.
@@ -338,7 +363,7 @@ fn decode_supported(oid: &str, bytes: &[u8], names: &OidNames) -> Option<Extensi
         "2.5.29.32" => Some(ExtensionDetails::CertificatePolicies(
             crate::policies::decode(bytes, names)?,
         )),
-        _ => Some(ExtensionDetails::Unsupported),
+        _ => crate::additional::decode(oid, bytes, names),
     }
 }
 

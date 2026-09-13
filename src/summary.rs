@@ -82,8 +82,10 @@ pub struct ExtensionSummary {
 /// Owned certificate details for UI/FFI and optional Serde export.
 ///
 /// Schema version 1 uses lowercase unseparated hex for byte strings, signed Unix
-/// seconds for times, dotted OIDs, null for absent/unknown values, and snake_case
-/// tagged enums. Consumers must accept additional fields and unknown enum kinds.
+/// seconds for certificate/private-key validity, dotted OIDs, null for absent/unknown
+/// values, and snake_case tagged enums. SCT timestamp_unix_ms retains unsigned
+/// Unix milliseconds from its wire format. Consumers must accept additional fields
+/// and unknown enum kinds.
 /// Complete DER, signature, key and extension bytes are omitted; use CertificateInfo
 /// for those. This summary is not a lossless certificate representation or trust verdict.
 #[derive(Clone, Debug, PartialEq, Eq)]

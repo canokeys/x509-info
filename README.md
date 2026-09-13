@@ -45,6 +45,10 @@ optional `canokey::x509` facade re-exports this crate; no CanoKey crate is a dep
   X.400/EDI names), KU, EKU and Basic Constraints.
 - SKI/AKI, AIA/SIA access methods and locations, CRL Distribution Points and Freshest CRL.
 - Certificate Policies with CPS URIs and preserved UserNotice/private qualifier encodings.
+- Name Constraints, Policy Constraints/Mappings and Inhibit Any Policy.
+- Private Key Usage Period and multi-valued Subject Directory Attributes.
+- TLS Feature numbers, OCSP no-check, CT poison and embedded SCT lists.
+- Netscape certificate-type flags and comments.
 - Raw certificate/name/SPKI/signature/extension data, unknown OIDs and duplicate extension flags.
 
 Unsupported extensions stay `Unsupported`; failed supported extension decoding stays
@@ -62,6 +66,38 @@ The input budget is not an exact peak-memory bound: full results and summaries o
 copies. Parsing does not verify signatures, chains, identities, revocation, critical
 extension policy or mathematical key validity. `validity.contains(timestamp)` only
 checks the encoded interval; no clock, network, randomness or filesystem is accessed.
+
+## Additional extension fields
+
+| Extension | OID | Representation |
+| --- | --- | --- |
+| Name Constraints | 2.5.29.30 | Ordered permitted/excluded subtrees with minimum/maximum; IP address and mask remain separate |
+| Policy Constraints | 2.5.29.36 | Optional explicit-policy and mapping-inhibition counters |
+| Policy Mappings | 2.5.29.33 | Ordered issuer/subject OID pairs and labels, preserving duplicates |
+| Inhibit Any Policy | 2.5.29.54 | skipCerts counter |
+| Private Key Usage Period | 2.5.29.16 | Optional Unix-second bounds, separate from certificate validity |
+| Subject Directory Attributes | 2.5.29.9 | Attribute OIDs/labels and complete DER values in encoded SET order |
+| TLS Feature | 1.3.6.1.5.5.7.1.24 | u16 numbers including unknowns/duplicates; 5=status_request, 17=status_request_v2 |
+| OCSP no-check | 1.3.6.1.5.5.7.48.1.5 | NULL marker; does not disable revocation checks |
+| CT poison | 1.3.6.1.4.1.11129.2.4.3 | NULL marker; does not establish precertificate eligibility |
+| SCT list | 1.3.6.1.4.1.11129.2.4.2 | v1 log ID, Unix milliseconds, extensions, algorithm numbers and signature; unknown versions retain entry bytes |
+| Netscape certificate type | 2.16.840.1.113730.1.1 | Eight flags, including the reserved bit |
+| Netscape comment | 2.16.840.1.113730.1.13 | IA5 text without markup sanitization |
+
+These fields appear in both full results and summaries. Counters/distances use
+u32; values outside the backend representation produce `Malformed`. The strict
+RustCrypto name-constraint decoder does not support X.400 bases; other choices
+reuse the owned name projection. IP constraints accept 8/32-byte address+mask
+encodings, preserve host bits and noncontiguous masks, and expose other lengths
+as `MalformedIp` with retained bytes. They never use SAN host-address conversion.
+Private-key times follow the backend's 1970–9999 year range; bounds are not checked
+against certificate validity or the current clock.
+
+SCT list, entry, and DER lengths must be consumed exactly. Unknown SCT versions
+remain opaque, and unknown v1 algorithm numbers remain numeric. No CT log lookup,
+signature verification, TLS enforcement, name matching, or policy-path processing
+occurs. CRL/CRL-entry extensions require a separate CRL inspection API and remain
+uninterpreted here. UserNotice/private qualifiers retain their existing raw form.
 
 ## OID names and caller customization
 
@@ -133,8 +169,8 @@ kinds allowed by schema version 1. Existing variants keep their representation.
 `info.summary()` returns `CertificateSummary`, whose optional Serde representation
 has `schema_version: 1`. It omits full DER, raw key/signature/parameter/extension bytes.
 Keep `CertificateInfo` when the application needs those encodings. Policy qualifier
-value DER and opaque GeneralName contents remain as hex in the summary so
-uninterpreted values are not discarded. Only CPS URI has a decoded policy qualifier
+value DER, opaque GeneralName contents, directory-attribute values, and SCT
+byte fields remain as hex in the summary so uninterpreted values are not discarded. Only CPS URI has a decoded policy qualifier
 variant. Full-result Serde
 is also available, but is a diagnostic representation tied to crate SemVer, not the
 versioned summary contract.
@@ -142,7 +178,8 @@ versioned summary contract.
 - Byte values in the summary use lowercase unseparated hex. Serial hex preserves
   the original INTEGER content, including sign padding. Name attribute value hex
   preserves unsupported string encodings without lossy conversion.
-- Times are signed Unix seconds. OIDs use dotted decimal. Missing/unknown optional
+- Certificate/private-key times are signed Unix seconds; SCT `timestamp_unix_ms`
+  is unsigned Unix milliseconds. OIDs use dotted decimal. Missing/unknown optional
   values serialize as null. RDNs are arrays of attribute arrays, not flattened maps.
 - Enums use snake_case `kind`/`value` tags; status enums use snake_case strings.
   Consumers must tolerate additional fields and unknown kinds/statuses. Incompatible

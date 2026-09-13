@@ -35,15 +35,25 @@
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
+mod additional;
+#[cfg(test)]
+mod additional_tests;
 mod algorithms;
+mod constraints;
 mod extensions;
 mod locations;
 mod names;
 mod oids;
 mod policies;
 mod summary;
+mod transparency;
 
+pub use additional::{
+    DirectoryAttribute, NetscapeCertificateType, PolicyConstraints, PolicyMapping,
+    PrivateKeyUsagePeriod,
+};
 pub use algorithms::{AlgorithmInfo, KeyDataStatus, ParameterStatus, PssParameters};
+pub use constraints::{ConstraintName, GeneralSubtree, NameConstraints};
 pub use extensions::{ExtensionDetails, ExtensionInfo, GeneralName, KeyPurpose, KeyUsage};
 pub use locations::{
     AccessDescription, AuthorityKeyIdentifier, DistributionPoint, DistributionPointName,
@@ -54,6 +64,7 @@ pub use policies::{CertificatePolicy, PolicyQualifier, PolicyQualifierDetails};
 pub use summary::{
     AlgorithmSummary, CertificateSummary, ExtensionSummary, NameSummary, PublicKeySummary,
 };
+pub use transparency::{SctEntry, SignedCertificateTimestamp};
 
 use sha2::{Digest, Sha256};
 use x509_parser::nom::Parser;
