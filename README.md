@@ -3,10 +3,11 @@
 [![CI](https://github.com/canokeys/x509-info/actions/workflows/ci.yml/badge.svg)](https://github.com/canokeys/x509-info/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/x509-info.svg)](https://crates.io/crates/x509-info)
 [![docs.rs](https://docs.rs/x509-info/badge.svg)](https://docs.rs/x509-info)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/canokeys/x509-info/blob/main/LICENSE)
 
-Owned X.509 certificate data for applications, bindings and reports. Parse DER or
-PEM into names, algorithms, public-key components and decoded extensions, including
+Owned X.509 certificate data for applications, bindings and reports. Read DER and
+PEM certificates, then emit text, JSON, JSON Lines, YAML, TOML, CBOR, MessagePack,
+DER or PEM output. Parse into names, algorithms, public-key components and decoded extensions, including
 FIDO identifiers. Unknown fields retain their original encodings and diagnostics.
 
 The library performs no I/O, reads no clock, and verifies no signatures, trust chains
@@ -33,11 +34,11 @@ x509-info = { version = "0.1.0", features = ["serde"] }
 serde_json = "1"
 ```
 
-```rust
+```rust,no_run
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pem = std::fs::read("certificate.pem")?;
     let cert = x509_info::parse_pem(&pem, Default::default())?;
-    println!("{}", serde_json::to_string_pretty(&cert.summary())?);
+    println!("{:#?}", cert.summary());
     Ok(())
 }
 ```
@@ -92,4 +93,4 @@ cargo test --all-features --locked
 cargo clippy --all-targets --all-features --locked -- -D warnings
 ```
 
-Licensed under [Apache-2.0](LICENSE).
+Licensed under [Apache-2.0](https://github.com/canokeys/x509-info/blob/main/LICENSE).

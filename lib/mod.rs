@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 //! Owned X.509 certificate inspection, independent of applets and transport.
 //!
 //! This extracts the reusable DER/PEM inspection responsibility from Console's

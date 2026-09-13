@@ -148,6 +148,7 @@ impl crate::ExtensionInfo {
     /// The legacy details enum is unchanged. Unclassified means the older decoding
     /// path discarded its cause; it must not be interpreted as proven invalid DER.
     /// No validity, critical-extension policy, or trust checks are performed.
+    #[allow(clippy::unnecessary_map_or)]
     pub fn diagnostic(&self) -> Option<DecodeDiagnostic> {
         use crate::ExtensionDetails;
         if matches!(self.details, ExtensionDetails::Unsupported) {
@@ -171,7 +172,7 @@ impl crate::ExtensionInfo {
                 Ok(v)
                     if !value.data.is_empty()
                         && value.data[0] & 0x80 == 0
-                        && v.value.is_none_or(|n| n > i64::from(u32::MAX)) =>
+                        && v.value.map_or(true, |n| n > i64::from(u32::MAX)) =>
                 {
                     DecodeDiagnostic::new(DecodeIssue::RepresentationLimit, "skipCerts u32")
                 }
