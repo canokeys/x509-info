@@ -130,6 +130,7 @@ External dependencies are intentional: `zeroize` protects buffers, `flate2` hand
 - [Plan](plan.md): milestones, remaining scope, acceptance.
 - [API design](docs/api-design.md): ownership and protocol contracts, including explicitly marked future APIs.
 - [Reference sources](docs/references.md): pinned upstream evidence.
+- [X.509 ecosystem research](docs/research/x509-ecosystem.md): alternatives, generic package positioning, and publication options.
 - [Contributor instructions](AGENTS.md): English repository language, architecture, checks, and commits.
 
 ## License
