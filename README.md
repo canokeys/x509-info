@@ -17,10 +17,10 @@ or attestation policy. Callers own all inputs, results and OID overrides.
 
 | Library | Focus |
 | --- | --- |
-| x509-parser | Borrowed certificate types and low-level parsing; used internally |
-| x509-cert | RustCrypto ASN.1 structures and certificate construction; nested decoders reused here |
-| x509-certificate-printer | Formatted certificate text |
-| x509-info | Owned application data, field diagnostics, versioned reports and generated schemas |
+| [`x509-parser`](https://crates.io/crates/x509-parser) | Borrowed certificate types and low-level parsing; used internally |
+| [`x509-cert`](https://crates.io/crates/x509-cert) | RustCrypto ASN.1 structures and certificate construction; nested decoders reused here |
+| [`x509-certificate-printer`](https://crates.io/crates/x509-certificate-printer) | Formatted certificate text |
+| **This crate: [`x509-info`](https://crates.io/crates/x509-info)** | Owned application data, field diagnostics, versioned reports and generated schemas |
 
 See the [ecosystem comparison](docs/x509-ecosystem.md) for alternatives and dependency choices.
 
@@ -30,7 +30,7 @@ Requires Rust 1.85+.
 
 ```toml
 [dependencies]
-x509-info = { version = "0.1.0", features = ["serde"] }
+x509-info = { version = "0.1", features = ["serde"] }
 serde_json = "1"
 ```
 
