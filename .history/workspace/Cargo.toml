@@ -7,7 +7,7 @@ members = [
     "crates/canokey-piv",
     "crates/canokey",
     "crates/canokey-c",
-    "crates/canokey-x509",
+    "crates/x509-info",
 ]
 
 [workspace.package]
@@ -27,4 +27,4 @@ canokey-compat = { path = "crates/canokey-compat" }
 canokey-admin = { path = "crates/canokey-admin" }
 canokey-piv = { path = "crates/canokey-piv" }
 canokey = { path = "crates/canokey" }
-canokey-x509 = { path = "crates/canokey-x509" }
+x509-info = { path = "crates/x509-info", version = "0.1.0" }

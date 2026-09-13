@@ -1,4 +1,4 @@
-use canokey_x509::{parse_der, parse_pem, Error, ParseOptions};
+use x509_info::{parse_der, parse_pem, Error, ParseOptions};
 
 const PEM: &[u8] = include_bytes!("fixtures/inspection.pem");
 

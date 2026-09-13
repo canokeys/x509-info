@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: phase 1a foundation implemented; phase 1b includes PIN/PUK, object reads, and certificate reads with bounded gzip decoding. A matching subset of the experimental C ABI exists. Generic DER/PEM inspection is available in the optional canokey-x509 crate, with owned results and optional Serde serialization. This work is confined to libcanokey; consumer integration requires a separate task. See [README](README.md) for actual APIs and commands, [design](docs/api-design.md) for contracts, and [references](docs/references.md) for evidence.
+Status: phase 1a foundation implemented; phase 1b includes PIN/PUK, object reads, and certificate reads with bounded gzip decoding. A matching subset of the experimental C ABI exists. Generic DER/PEM inspection is available in the optional x509-info crate, with owned results and optional Serde serialization. This work is confined to libcanokey; consumer integration requires a separate task. See [README](README.md) for actual APIs and commands, [design](docs/api-design.md) for contracts, and [references](docs/references.md) for evidence.
 
 ## Goal and boundaries
 

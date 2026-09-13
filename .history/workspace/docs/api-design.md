@@ -120,7 +120,7 @@ File I/O, private-key PEM/PKCS#8 import, CSR/X.509 policy, PKCS#11 padding/KDF a
 
 ## Generic certificate inspection
 
-`canokey-x509` is independent of PIV/protocol and re-exported as `canokey::x509` under the `x509` feature. It adapts Console's Rust DER/PEM extraction using the same `x509-parser` dependency plus strict `pem-rfc7468` decoding, without FRB, logging, clocks, randomness or device state. The PIV certificate operation still unwraps its applet container; inspection is a separate synchronous pure function. Other applets/applications can use it directly.
+`x509-info` is independent of PIV/protocol and re-exported as `canokey::x509` under the `x509` feature. It adapts Console's Rust DER/PEM extraction using the same `x509-parser` dependency plus strict `pem-rfc7468` decoding, without FRB, logging, clocks, randomness or device state. The PIV certificate operation still unwraps its applet container; inspection is a separate synchronous pure function. Other applets/applications can use it directly.
 
 `parse_der(bytes, ParseOptions)` and `parse_pem(bytes, ParseOptions)` return an owned `CertificateInfo`. Input is borrowed only for the call; the default encoded-input budget is 1 MiB, checked before parsing/base64 decoding. Exactly one certificate is accepted; PEM permits surrounding ASCII whitespace but no bundles or extra text. DER trailing bytes and inconsistent inner/outer signature algorithm identifiers fail. Errors are typed local parsing failures, not fabricated card status errors.
 
@@ -172,7 +172,7 @@ Use established libraries for standard cryptography and standard key formats. Th
 | Need | Dependency direction | Boundary and status |
 | --- | --- | --- |
 | Typed errors | `thiserror` | Used for protocol and X.509 errors; preserves public kinds/fields and redacted Display. `anyhow` may aggregate application errors but is not a public core error type |
-| Certificate inspection | `x509-parser` with default features disabled and `pem-rfc7468` | Used by optional canokey-x509, following Console; no signature-verification backend, transport, or OS RNG |
+| Certificate inspection | `x509-parser` with default features disabled and `pem-rfc7468` | Used by optional x509-info, following Console; no signature-verification backend, transport, or OS RNG |
 | Result serialization | Optional `serde` | Owned certificate structs derive Serialize; JSON library choice stays in the application |
 | Secret erasure | `zeroize` / `Zeroizing` | Already used by protocol. `SecretBytes` adds redacted Debug and wipes old allocations during growth; replacing that behavior requires equivalent guarantees |
 | Certificate gzip | `flate2` with `rust_backend` and default features disabled | Already used by PIV. The applet layer still enforces input/output bounds, container rules, and trailing-data rejection |

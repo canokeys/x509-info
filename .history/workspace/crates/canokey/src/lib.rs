@@ -58,6 +58,6 @@ pub use canokey_protocol::{
 };
 /// Optional, transport-free X.509 inspection (`x509` feature).
 #[cfg(feature = "x509")]
-pub use canokey_x509 as x509;
+pub use x509_info as x509;
 mod probe;
 pub use probe::{probe_device, ProbeMode, ProbeOptions};

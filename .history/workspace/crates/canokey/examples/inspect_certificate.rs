@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .read_to_end(&mut bytes)?;
         bytes
     } else {
-        include_bytes!("../../canokey-x509/tests/fixtures/inspection.pem").to_vec()
+        include_bytes!("../../x509-info/tests/fixtures/inspection.pem").to_vec()
     };
     let info = if bytes.trim_ascii().starts_with(b"-----BEGIN ") {
         parse_pem(&bytes, options)?

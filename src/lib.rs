@@ -19,14 +19,14 @@
 //! # Example
 //!
 //! ```
-//! use canokey_x509::{parse_pem, ParseOptions};
+//! use x509_info::{parse_pem, ParseOptions};
 //! # let pem = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/inspection.pem"));
 //! let info = parse_pem(pem, ParseOptions::default())?;
 //! assert_eq!(info.public_key.key_size_bits, Some(256));
 //! assert_eq!(info.public_key.algorithm_oid, "1.2.840.10045.2.1");
 //! let subject = info.subject; // An owned value, independent of the PEM input.
 //! assert!(subject.display.contains("libcanokey test certificate"));
-//! # Ok::<(), canokey_x509::Error>(())
+//! # Ok::<(), x509_info::Error>(())
 //! ```
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]

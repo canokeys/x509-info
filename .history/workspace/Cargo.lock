@@ -67,8 +67,8 @@ dependencies = [
  "canokey-compat",
  "canokey-piv",
  "canokey-protocol",
- "canokey-x509",
  "serde_json",
+ "x509-info",
 ]
 
 [[package]]
@@ -107,17 +107,6 @@ version = "0.1.0"
 dependencies = [
  "thiserror",
  "zeroize",
-]
-
-[[package]]
-name = "canokey-x509"
-version = "0.1.0"
-dependencies = [
- "pem-rfc7468",
- "serde",
- "serde_json",
- "thiserror",
- "x509-parser",
 ]
 
 [[package]]
@@ -452,6 +441,17 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "x509-info"
+version = "0.1.0"
+dependencies = [
+ "pem-rfc7468",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "x509-parser",
+]
 
 [[package]]
 name = "x509-parser"

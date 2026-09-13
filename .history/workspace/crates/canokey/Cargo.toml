@@ -16,11 +16,11 @@ canokey-compat.workspace = true
 canokey-admin.workspace = true
 canokey-piv.workspace = true
 
-canokey-x509 = { workspace = true, optional = true }
+x509-info = { workspace = true, optional = true }
 
 [features]
-x509 = ["dep:canokey-x509"]
-serde = ["x509", "canokey-x509/serde"]
+x509 = ["dep:x509-info"]
+serde = ["x509", "x509-info/serde"]
 
 [dev-dependencies]
 serde_json = "1"

@@ -13,7 +13,7 @@ Most Rust applications should depend on **`canokey`**. C applications link **`ca
 | `canokey-admin` | Minimal read-only Admin bootstrap command builders | protocol |
 | `canokey-piv` | PIV operations and certificate container parsing | protocol, compat |
 | `canokey` | Application-facing facade: re-exports lower layers and orchestrates device probing | protocol, compat, admin, piv; optional x509 |
-| `canokey-x509` | Bounded DER/PEM inspection into owned certificate structures; optional Serde serialization | None |
+| `x509-info` | Bounded DER/PEM inspection into owned certificate structures; optional Serde serialization | None |
 | `canokey-c` | C ABI: converts descriptors, dispatches operations, copies results | canokey |
 
 Dependency arrows point from consumer to dependency:
@@ -25,14 +25,14 @@ graph TD
     F --> P[canokey-piv]
     F --> K[canokey-compat]
     F --> R[canokey-protocol]
-    F -. optional x509 feature .-> X[canokey-x509]
+    F -. optional x509 feature .-> X[x509-info]
     P --> K
     P --> R
     K --> R
     A --> R
 ```
 
-`protocol` knows nothing about firmware or applets. `compat` never calls an applet; putting probe orchestration in the facade avoids a dependency cycle. `admin` currently contains only bootstrap builders, so it does not yet need compat. Bindings adapt ownership and types without duplicating protocol state. There is no transport crate or mutable global state. `canokey-x509` is independent of applets: PIV removes its certificate container, then an application can inspect the DER through this optional crate. Default facade/C builds do not include X.509 parsing.
+`protocol` knows nothing about firmware or applets. `compat` never calls an applet; putting probe orchestration in the facade avoids a dependency cycle. `admin` currently contains only bootstrap builders, so it does not yet need compat. Bindings adapt ownership and types without duplicating protocol state. There is no transport crate or mutable global state. `x509-info` is independent of applets: PIV removes its certificate container, then an application can inspect the DER through this optional crate. Default facade/C builds do not include X.509 parsing.
 
 ## Implemented scope
 
@@ -69,7 +69,7 @@ For real hardware, hold one exclusive connection lease across the entire operati
 
 ## Certificate structures and JSON
 
-The optional parser is usable directly as `canokey-x509`, or through the facade:
+The optional parser is usable directly as `x509-info`, or through the facade:
 
 ```toml
 [dependencies]
@@ -137,4 +137,4 @@ External dependencies are intentional: `zeroize` protects buffers, `flate2` hand
 
 Copyright 2026 canokeys.org.
 
-Licensed under the [Apache License, Version 2.0](LICENSE). The root license applies to all original workspace crates, examples, and documentation. Each crate inherits the SPDX identifier, license file, authors, and homepage from workspace metadata; Cargo includes the shared license file in packaged crates. Third-party dependencies and read-only reference repositories retain their own licenses. Adapted Console certificate-extraction code retains its [upstream MIT notice](crates/canokey-x509/LICENSE.console).
+Licensed under the [Apache License, Version 2.0](LICENSE). The root license applies to all original workspace crates, examples, and documentation. Each crate inherits the SPDX identifier, license file, authors, and homepage from workspace metadata; Cargo includes the shared license file in packaged crates. Third-party dependencies and read-only reference repositories retain their own licenses. Adapted Console certificate-extraction code retains its [upstream MIT notice](crates/x509-info/LICENSE.console).
