@@ -126,15 +126,19 @@ File I/O, private-key PEM/PKCS#8 import, CSR/X.509 policy, PKCS#11 padding/KDF a
 
 | Result | Representation |
 | --- | --- |
-| Subject/issuer | Presentation text plus exact Name DER, retaining attributes and RDN encodings |
+| Subject/issuer | Presentation text, ordered RDN/attribute groups and exact Name DER |
 | Validity | Signed Unix-second bounds; `contains(timestamp)` takes an explicit caller timestamp |
-| Serial/signature | Original serial INTEGER bytes and signature BIT STRING bytes/unused-bit count; signature algorithm OID |
-| Public key | Algorithm/curve OIDs, complete SPKI DER, raw key bytes, optional algorithm-specific size, separate encoded bit count |
-| Extensions | OID, critical flag and raw inner value bytes in certificate order |
+| Serial/signature | Original serial INTEGER bytes and signature BIT STRING bytes/unused-bit count; signature algorithm OID, label and decoded RSA-PSS parameters |
+| Public key | Algorithm/curve OIDs, complete SPKI DER, raw key bytes, optional algorithm-specific size, key/parameter inspection status, separate encoded bit count |
+| Extensions | OID, critical/duplicate flags, raw inner bytes and decoded SAN/KU/EKU/Basic Constraints in certificate order |
 
 Unknown key algorithms remain inspectable without inventing their size. This differs from Console's old fallback of encoded bytes times eight. Known EC size comes from its named curve (so P-521 remains 521, not 528); RSA size excludes INTEGER sign padding. Inspection does not validate EC points, verify signatures, process critical-extension policy, build chains or establish trust. Raw DER is retained for richer application processing.
 
-The optional `serde` feature derives Serialize on result structs; the facade feature enables both X.509 and serialization. JSON is caller-owned (`serde_json`), with byte arrays, Unix seconds and null for unknown key sizes. FRB uses explicit DTO mapping and does not require JSON. There is no new operation, result handle, cache or global state. MacOS certificate eligibility, CSR/self-signed issuance policy, mixed private-key import, and QR/image decoding stay in Console.
+`summary()` produces a separate owned `CertificateSummary` with SHA-256, application fields and no full DER/key/signature/extension copies. Optional Serde exposes schema version 1: lowercase hex byte strings, Unix seconds, dotted OIDs, null optional values and tagged extension/name choices. Full-result Serde retains numeric byte arrays for diagnostics. The detailed representation and supported algorithms are maintained in the [package README](../crates/x509-info/README.md). Result structs/enums are non-exhaustive where expansion is expected.
+
+Supported extension decoding failures are `Malformed`; unhandled OIDs are `Unsupported`. All occurrences of a repeated extension OID are marked `duplicate`; no occurrence is silently selected. These findings do not enforce RFC 5280 policy. Key encoding and algorithm parameter status are separate; unknown algorithms do not become malformed key errors. RSA-PSS is decoded by `pkcs1` within its documented salt/trailer representation, with raw parameters preserved on failure. Fingerprints use `sha2`, not local cryptography.
+
+FRB uses explicit application DTO mapping and does not require JSON. There is no new operation, result handle, cache or global state. macOS certificate eligibility, CSR/self-signed issuance policy, mixed private-key import, and QR/image decoding stay in Console.
 
 ## Planned Batch
 
@@ -172,7 +176,7 @@ Use established libraries for standard cryptography and standard key formats. Th
 | Need | Dependency direction | Boundary and status |
 | --- | --- | --- |
 | Typed errors | `thiserror` | Used for protocol and X.509 errors; preserves public kinds/fields and redacted Display. `anyhow` may aggregate application errors but is not a public core error type |
-| Certificate inspection | `x509-parser` with default features disabled and `pem-rfc7468` | Used by optional x509-info, following Console; no signature-verification backend, transport, or OS RNG |
+| Certificate inspection | `x509-parser` with default features disabled, `pem-rfc7468`, `pkcs1`, `sha2`, and `hex` | Used by optional x509-info, following Console; no signature-verification backend, transport, or OS RNG |
 | Result serialization | Optional `serde` | Owned certificate structs derive Serialize; JSON library choice stays in the application |
 | Secret erasure | `zeroize` / `Zeroizing` | Already used by protocol. `SecretBytes` adds redacted Debug and wipes old allocations during growth; replacing that behavior requires equivalent guarantees |
 | Certificate gzip | `flate2` with `rust_backend` and default features disabled | Already used by PIV. The applet layer still enforces input/output bounds, container rules, and trailing-data rejection |

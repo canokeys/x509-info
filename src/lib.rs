@@ -11,10 +11,12 @@
 //! a timestamp to [`Validity::contains`] if it wants a validity-period check.
 //! Unknown algorithm/extension OIDs and their encoded data remain available.
 //!
-//! Enable `serde` for serialization of the public result types. JSON serialization
-//! belongs to the caller (for example `serde_json::to_string`); FRB callers can map
-//! the same owned fields to DTOs without a JSON round trip. Byte vectors serialize
-//! as arrays of octets, timestamps as Unix seconds, and unknown key sizes as null.
+//! [`CertificateInfo::summary`] provides owned application details, common decoded
+//! extensions and a SHA-256 fingerprint without raw certificate/key/signature copies.
+//! Enable `serde` for the versioned [`CertificateSummary`] serialization contract.
+//! Full-result serialization remains available for diagnostics (raw bytes are octet
+//! arrays). JSON belongs to callers; FRB can map these fields to its own DTOs.
+//! No public result borrows backend types or requires a registry/handle lifecycle.
 //!
 //! # Example
 //!
@@ -23,15 +25,38 @@
 //! # let pem = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/inspection.pem"));
 //! let info = parse_pem(pem, ParseOptions::default())?;
 //! assert_eq!(info.public_key.key_size_bits, Some(256));
-//! assert_eq!(info.public_key.algorithm_oid, "1.2.840.10045.2.1");
-//! let subject = info.subject; // An owned value, independent of the PEM input.
+//! assert_eq!(info.public_key.algorithm.oid, "1.2.840.10045.2.1");
+//! let details = info.summary();
+//! drop(info);
+//! let subject = details.subject; // Owned independently of parser input/results.
 //! assert!(subject.display.contains("libcanokey test certificate"));
 //! # Ok::<(), x509_info::Error>(())
 //! ```
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
-use x509_parser::{prelude::FromDer, public_key::PublicKey};
+mod algorithms;
+mod extensions;
+mod names;
+mod summary;
+
+pub use algorithms::{AlgorithmInfo, KeyDataStatus, ParameterStatus, PssParameters};
+pub use extensions::{ExtensionDetails, ExtensionInfo, GeneralName, KeyPurpose, KeyUsage};
+pub use names::{DistinguishedName, NameAttribute};
+pub use summary::{
+    AlgorithmSummary, CertificateSummary, ExtensionSummary, NameSummary, PublicKeySummary,
+};
+
+use sha2::{Digest, Sha256};
+use x509_parser::nom::Parser;
+
+impl CertificateInfo {
+    /// SHA-256 digest of the retained certificate DER; no trust decision is implied.
+    /// This recomputes the digest from the current bytes, without caching or global state.
+    pub fn sha256_fingerprint(&self) -> [u8; 32] {
+        Sha256::digest(&self.der).into()
+    }
+}
 
 /// Limits for a single certificate input; defaults to 1 MiB.
 #[derive(Clone, Copy, Debug)]
@@ -75,16 +100,6 @@ pub enum Error {
     InconsistentSignatureAlgorithm,
 }
 
-/// Owned distinguished name, with both presentation text and exact encoded data.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct DistinguishedName {
-    /// Parser-generated display text; do not use string equality as name matching.
-    pub display: String,
-    /// Complete DER Name encoding, preserving RDN order, attributes and string types.
-    pub der: Vec<u8>,
-}
-
 /// Certificate validity interval as signed Unix seconds, independent of a clock.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
@@ -105,12 +120,17 @@ impl Validity {
 /// Owned public-key algorithm and encoding, without performing key validation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 pub struct PublicKeyInfo {
-    /// Dotted-decimal SubjectPublicKeyInfo algorithm OID.
-    pub algorithm_oid: String,
+    /// Algorithm name, OID and parameter inspection.
+    pub algorithm: AlgorithmInfo,
+    /// Whether supported key encoding was decoded; no mathematical validation is performed.
+    pub key_data_status: KeyDataStatus,
+    /// Common named-curve label, when recognized.
+    pub curve_name: Option<String>,
     /// Named-curve parameter OID when encoded as an OID; otherwise absent.
     pub curve_oid: Option<String>,
-    /// RSA modulus bit length or nominal size of a recognized named EC curve.
+    /// RSA modulus bit length or nominal size of a recognized EC/EdDSA curve.
     /// None for unknown algorithms/curves or undecodable key data. This does not
     /// validate the key and is never replaced with the encoded bit-string length.
     pub key_size_bits: Option<usize>,
@@ -123,26 +143,16 @@ pub struct PublicKeyInfo {
     pub key_bytes: Vec<u8>,
 }
 
-/// An uninterpreted X.509 extension, retained in certificate order.
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct ExtensionInfo {
-    /// Dotted-decimal extension OID; unknown OIDs are preserved.
-    pub oid: String,
-    /// Whether the certificate marks this extension critical.
-    pub critical: bool,
-    /// Inner extnValue octets, without the outer OCTET STRING wrapper.
-    /// This parser does not validate the extension's application semantics.
-    pub value_der: Vec<u8>,
-}
-
 /// Owned certificate inspection result; no input lifetime or device state.
 ///
 /// Fields describe parsed data, not a trusted identity. The original DER remains
 /// available for consumers that need richer policy/extension processing.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[non_exhaustive]
 pub struct CertificateInfo {
+    /// Outer signature algorithm with decoded parameters where supported.
+    pub signature_algorithm: AlgorithmInfo,
     /// Complete certificate DER, with no trailing object metadata or other certificate.
     pub der: Vec<u8>,
     /// One-based X.509 version (1, 2 or 3 for standard versions).
@@ -155,22 +165,20 @@ pub struct CertificateInfo {
     pub validity: Validity,
     /// Original serial INTEGER content bytes, retaining any leading sign-padding byte.
     pub serial_number: Vec<u8>,
-    /// Dotted-decimal outer signature algorithm OID (checked against the TBS identifier).
-    pub signature_algorithm_oid: String,
     /// Signature BIT STRING bytes without its unused-bit count prefix.
     pub signature_value: Vec<u8>,
     /// Number of unused bits in the final signature byte.
     pub signature_unused_bits: u8,
     /// Encoded public-key information and any recognized key size.
     pub public_key: PublicKeyInfo,
-    /// Raw extension values in encoded order; no policy is enforced.
+    /// Extensions in encoded order, with common decoded values; no policy is enforced.
     pub extensions: Vec<ExtensionInfo>,
 }
 impl std::fmt::Debug for CertificateInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CertificateInfo")
             .field("version", &self.version)
-            .field("signature_algorithm_oid", &self.signature_algorithm_oid)
+            .field("signature_algorithm_oid", &self.signature_algorithm.oid)
             .finish_non_exhaustive()
     }
 }
@@ -197,7 +205,9 @@ fn check_limit(bytes: &[u8], options: ParseOptions) -> Result<(), Error> {
 /// Syntactic parsing does not verify signatures, key points, extensions or trust.
 pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo, Error> {
     check_limit(bytes, options)?;
-    let (rest, cert) = x509_parser::certificate::X509Certificate::from_der(bytes)
+    let (rest, cert) = x509_parser::certificate::X509CertificateParser::new()
+        .with_deep_parse_extensions(false)
+        .parse(bytes)
         .map_err(|_| Error::InvalidCertificate)?;
     if !rest.is_empty() {
         return Err(Error::TrailingData);
@@ -227,47 +237,42 @@ pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo,
     } else {
         None
     };
-    let key_size_bits = match spki.parsed().ok() {
-        Some(PublicKey::RSA(key)) if key.modulus.first().is_some_and(|b| b & 0x80 == 0) => {
-            key.modulus.iter().position(|b| *b != 0).map(|first| {
-                (key.modulus.len() - first) * 8 - key.modulus[first].leading_zeros() as usize
-            })
-        }
-        Some(PublicKey::EC(_)) => match curve_oid.as_deref() {
-            Some("1.2.840.10045.3.1.7" | "1.3.132.0.10" | "1.2.156.10197.1.301") => Some(256),
-            Some("1.3.132.0.34") => Some(384),
-            Some("1.3.132.0.35") => Some(521),
-            _ => None,
-        },
-        _ => None,
-    };
+    let (key_size_bits, key_data_status) = algorithms::key_details(
+        &algorithm_oid,
+        curve_oid.as_deref(),
+        &spki.subject_public_key.data,
+        spki.subject_public_key.unused_bits,
+    );
+    let mut counts = std::collections::BTreeMap::new();
+    for extension in cert.extensions() {
+        *counts.entry(extension.oid.to_id_string()).or_insert(0usize) += 1;
+    }
     Ok(CertificateInfo {
+        signature_algorithm: algorithms::inspect(&cert.signature_algorithm, true)?,
         der: bytes.to_vec(),
         version: cert
             .version()
             .0
             .checked_add(1)
             .ok_or(Error::InvalidCertificate)?,
-        subject: DistinguishedName {
-            display: cert.subject().to_string(),
-            der: cert.subject().as_raw().to_vec(),
-        },
-        issuer: DistinguishedName {
-            display: cert.issuer().to_string(),
-            der: cert.issuer().as_raw().to_vec(),
-        },
+        subject: names::inspect_name(cert.subject()),
+        issuer: names::inspect_name(cert.issuer()),
         validity: Validity {
             not_before_unix: cert.validity().not_before.timestamp(),
             not_after_unix: cert.validity().not_after.timestamp(),
         },
         serial_number: cert.raw_serial().to_vec(),
-        signature_algorithm_oid: cert.signature_algorithm.algorithm.to_id_string(),
         signature_value: cert.signature_value.data.to_vec(),
         signature_unused_bits: cert.signature_value.unused_bits,
         public_key: PublicKeyInfo {
-            algorithm_oid,
+            algorithm: algorithms::inspect(&spki.algorithm, false)?,
+            curve_name: curve_oid
+                .as_deref()
+                .and_then(algorithms::curve_name)
+                .map(str::to_owned),
             curve_oid,
             key_size_bits,
+            key_data_status,
             encoded_key_bits,
             spki_der: spki.raw.to_vec(),
             key_bytes: spki.subject_public_key.data.to_vec(),
@@ -278,6 +283,8 @@ pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo,
             .map(|extension| ExtensionInfo {
                 oid: extension.oid.to_id_string(),
                 critical: extension.critical,
+                duplicate: counts[&extension.oid.to_id_string()] > 1,
+                details: extensions::decode(&extension.oid.to_id_string(), extension.value),
                 value_der: extension.value.to_vec(),
             })
             .collect(),

@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: phase 1a foundation implemented; phase 1b includes PIN/PUK, object reads, and certificate reads with bounded gzip decoding. A matching subset of the experimental C ABI exists. Generic DER/PEM inspection is available in the optional x509-info crate, with owned results and optional Serde serialization. This work is confined to libcanokey; consumer integration requires a separate task. See [README](README.md) for actual APIs and commands, [design](docs/api-design.md) for contracts, and [references](docs/references.md) for evidence.
+Status: phase 1a foundation implemented; phase 1b includes PIN/PUK, object reads, and certificate reads with bounded gzip decoding. A matching subset of the experimental C ABI exists. Generic DER/PEM inspection is available in the optional x509-info crate, with owned details, common extension decoding, RSA/EC/EdDSA and PSS information, SHA-256 fingerprints and a versioned optional Serde summary. This work is confined to libcanokey; consumer integration requires a separate task. See [README](README.md) for actual APIs and commands, [design](docs/api-design.md) for contracts, and [references](docs/references.md) for evidence.
 
 ## Goal and boundaries
 
@@ -24,6 +24,19 @@ Caller-owned profiles and operations are the common Rust/binding model. No trans
 Next PIV work: verify management-key modes against CanoKey evidence, then implement authentication using established block-cipher/comparison dependencies and add authenticated writes; follow with metadata, key generation/import and private operations, and Batch. Extend C bindings alongside useful core increments. Do not add placeholder APIs that always return Unsupported.
 
 Algorithm enums do not promise firmware support. Enable metadata directories, key move/delete, retry configuration, algorithm configuration writes, and ML-KEM decapsulation individually by observed capability. Pending verification is listed in design.
+
+## Generic certificate package
+
+The initial `x509-info` application model and local details/JSON/binding examples
+are implemented. It has an independent package version and retains the facade
+re-export. No consumer repository is integrated. Remaining release work: finalize
+repository/documentation URLs and publication policy, then explicitly release the
+package. `publish = false` remains intentional; implementation does not publish it.
+
+Acceptance: native/default/all-feature tests, malformed and duplicate extension
+coverage, unknown algorithm handling, stable summary golden data, caller-owned DTO
+example, wasm build and standalone package verification. Broader extensions follow
+consumer demand; issuance, chain validation and network access remain out of scope.
 
 ## Engineering and delivery
 

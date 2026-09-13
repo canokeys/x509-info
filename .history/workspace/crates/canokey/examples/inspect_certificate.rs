@@ -19,6 +19,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         parse_der(&bytes, options)?
     };
     // JSON is an application choice: FRB can instead map the owned struct to a DTO.
-    println!("{}", serde_json::to_string_pretty(&info)?);
+    println!("{}", serde_json::to_string_pretty(&info.summary())?);
     Ok(())
 }

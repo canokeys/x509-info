@@ -13,7 +13,7 @@ Most Rust applications should depend on **`canokey`**. C applications link **`ca
 | `canokey-admin` | Minimal read-only Admin bootstrap command builders | protocol |
 | `canokey-piv` | PIV operations and certificate container parsing | protocol, compat |
 | `canokey` | Application-facing facade: re-exports lower layers and orchestrates device probing | protocol, compat, admin, piv; optional x509 |
-| `x509-info` | Bounded DER/PEM inspection into owned certificate structures; optional Serde serialization | None |
+| `x509-info` | Owned certificate details, decoded common extensions, algorithm information and optional summary serialization | None |
 | `canokey-c` | C ABI: converts descriptors, dispatches operations, copies results | canokey |
 
 Dependency arrows point from consumer to dependency:
@@ -83,7 +83,7 @@ let certificate = execute(card, canokey::piv::read_certificate(
 let info = canokey::x509::parse_der(certificate.der(), Default::default())?;
 // info owns subject/issuer, validity, serial, signature, SPKI and extension data.
 // With the serde feature and an application dependency on serde_json:
-let json = serde_json::to_string(&info)?;
+let json = serde_json::to_string(&info.summary())?;
 ```
 
 Run a complete example using the bundled synthetic certificate or your own PEM/DER file:
@@ -93,7 +93,16 @@ cargo run -p canokey --features serde --example inspect_certificate --locked
 cargo run -p canokey --features serde --example inspect_certificate --locked -- certificate.pem
 ```
 
-The struct is the primary result. FRB wrappers can map it to Dart DTOs directly; JSON is optional and uses octet arrays for bytes, Unix seconds for times, and null for an unknown algorithm-specific key size. The encoded key-bit count is a separate field. A successful parse establishes neither signature validity nor trust, and no system clock is read. PEM bundles/trailing data are rejected. Existing PIV certificate reads still return unwrapped bytes; inspection is explicit.
+`info.summary()` provides structured DN attributes, SAN/KU/EKU/Basic Constraints,
+algorithm details and a SHA-256 fingerprint. The summary JSON uses lowercase hex,
+Unix seconds and explicit unknown/malformed states, omitting large raw encodings.
+`CertificateInfo` retains original data. FRB adapters map owned values to application
+DTOs without a JSON round trip or global registry. Parsing establishes neither
+signature validity nor trust; PIV certificate unwrapping remains a separate operation.
+
+See the [x509-info README](crates/x509-info/README.md) for the schema, supported
+algorithms, limitations and standalone `details`, `export_json` and `binding_dto`
+examples. They run independently of the CanoKey facade and import no backend types.
 
 ## Rust API documentation
 

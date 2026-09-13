@@ -1,6 +1,11 @@
 # X.509 inspection ecosystem and publication options
 
-Research date: 2026-09-13. This is a publication/design assessment, not a rename or release. The current package remains `canokey-x509` with `publish = false`.
+Research date: 2026-09-13. The comparison below records the pre-expansion
+`canokey-x509` adapter. Following this assessment, it was renamed to `x509-info`
+and the initial owned details/extension/summary scope was implemented. See the
+[current package README](../../crates/x509-info/README.md) for implemented behavior
+and limitations. Historical gap tables below describe the assessed adapter, not
+the expanded implementation. The package still has `publish = false`.
 
 ## Recommendation
 

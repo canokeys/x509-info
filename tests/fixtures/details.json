@@ -1,0 +1,213 @@
+{
+  "schema_version": 1,
+  "version": 3,
+  "subject": {
+    "display": "O=Example, OU=Research + CN=Certificate demo, OU=München, OID(1.2.3.4)=Custom",
+    "rdns": [
+      [
+        {
+          "oid": "2.5.4.10",
+          "label": "O",
+          "value": "Example",
+          "value_tag": 12,
+          "value_hex": "4578616d706c65"
+        }
+      ],
+      [
+        {
+          "oid": "2.5.4.11",
+          "label": "OU",
+          "value": "Research",
+          "value_tag": 12,
+          "value_hex": "5265736561726368"
+        },
+        {
+          "oid": "2.5.4.3",
+          "label": "CN",
+          "value": "Certificate demo",
+          "value_tag": 12,
+          "value_hex": "43657274696669636174652064656d6f"
+        }
+      ],
+      [
+        {
+          "oid": "2.5.4.11",
+          "label": "OU",
+          "value": "München",
+          "value_tag": 12,
+          "value_hex": "4dc3bc6e6368656e"
+        }
+      ],
+      [
+        {
+          "oid": "1.2.3.4",
+          "label": null,
+          "value": "Custom",
+          "value_tag": 12,
+          "value_hex": "437573746f6d"
+        }
+      ]
+    ]
+  },
+  "issuer": {
+    "display": "O=Example, OU=Research + CN=Certificate demo, OU=München, OID(1.2.3.4)=Custom",
+    "rdns": [
+      [
+        {
+          "oid": "2.5.4.10",
+          "label": "O",
+          "value": "Example",
+          "value_tag": 12,
+          "value_hex": "4578616d706c65"
+        }
+      ],
+      [
+        {
+          "oid": "2.5.4.11",
+          "label": "OU",
+          "value": "Research",
+          "value_tag": 12,
+          "value_hex": "5265736561726368"
+        },
+        {
+          "oid": "2.5.4.3",
+          "label": "CN",
+          "value": "Certificate demo",
+          "value_tag": 12,
+          "value_hex": "43657274696669636174652064656d6f"
+        }
+      ],
+      [
+        {
+          "oid": "2.5.4.11",
+          "label": "OU",
+          "value": "München",
+          "value_tag": 12,
+          "value_hex": "4dc3bc6e6368656e"
+        }
+      ],
+      [
+        {
+          "oid": "1.2.3.4",
+          "label": null,
+          "value": "Custom",
+          "value_tag": 12,
+          "value_hex": "437573746f6d"
+        }
+      ]
+    ]
+  },
+  "validity": {
+    "not_before_unix": 1735689600,
+    "not_after_unix": 1893456000
+  },
+  "serial_number_hex": "2d",
+  "sha256_fingerprint_hex": "bd740705246c4194a26690b3e7fbfb6b60a8e7d11c8bf27a84fdca4acb1dbaac",
+  "signature_algorithm": {
+    "oid": "1.2.840.10045.4.3.2",
+    "name": "ECDSA-SHA256",
+    "parameter_status": "absent",
+    "pss": null
+  },
+  "public_key": {
+    "algorithm": {
+      "oid": "1.2.840.10045.2.1",
+      "name": "EC",
+      "parameter_status": "decoded",
+      "pss": null
+    },
+    "key_data_status": "decoded",
+    "curve_oid": "1.2.840.10045.3.1.7",
+    "curve_name": "P-256",
+    "key_size_bits": 256
+  },
+  "extensions": [
+    {
+      "oid": "2.5.29.19",
+      "critical": true,
+      "duplicate": false,
+      "details": {
+        "kind": "basic_constraints",
+        "value": {
+          "ca": false,
+          "path_len_constraint": null
+        }
+      }
+    },
+    {
+      "oid": "2.5.29.15",
+      "critical": true,
+      "duplicate": false,
+      "details": {
+        "kind": "key_usage",
+        "value": {
+          "digital_signature": true,
+          "content_commitment": false,
+          "key_encipherment": false,
+          "data_encipherment": false,
+          "key_agreement": false,
+          "key_cert_sign": false,
+          "crl_sign": false,
+          "encipher_only": false,
+          "decipher_only": false
+        }
+      }
+    },
+    {
+      "oid": "2.5.29.37",
+      "critical": false,
+      "duplicate": false,
+      "details": {
+        "kind": "extended_key_usage",
+        "value": [
+          {
+            "oid": "1.3.6.1.5.5.7.3.2",
+            "name": "client_auth"
+          },
+          {
+            "oid": "1.2.3.5",
+            "name": null
+          }
+        ]
+      }
+    },
+    {
+      "oid": "2.5.29.17",
+      "critical": false,
+      "duplicate": false,
+      "details": {
+        "kind": "subject_alternative_name",
+        "value": [
+          {
+            "kind": "dns",
+            "value": "example.invalid"
+          },
+          {
+            "kind": "email",
+            "value": "test@example.invalid"
+          },
+          {
+            "kind": "ip",
+            "value": "192.0.2.1"
+          },
+          {
+            "kind": "ip",
+            "value": "2001:db8::1"
+          },
+          {
+            "kind": "uri",
+            "value": "https://example.invalid/cert"
+          }
+        ]
+      }
+    },
+    {
+      "oid": "1.2.3.6",
+      "critical": true,
+      "duplicate": false,
+      "details": {
+        "kind": "unsupported"
+      }
+    }
+  ]
+}
