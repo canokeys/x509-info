@@ -37,12 +37,20 @@
 
 mod algorithms;
 mod extensions;
+mod locations;
 mod names;
+mod oids;
+mod policies;
 mod summary;
 
 pub use algorithms::{AlgorithmInfo, KeyDataStatus, ParameterStatus, PssParameters};
 pub use extensions::{ExtensionDetails, ExtensionInfo, GeneralName, KeyPurpose, KeyUsage};
+pub use locations::{
+    AccessDescription, AuthorityKeyIdentifier, DistributionPoint, DistributionPointName,
+};
 pub use names::{DistinguishedName, NameAttribute};
+pub use oids::{InvalidOid, OidNames};
+pub use policies::{CertificatePolicy, PolicyQualifier, PolicyQualifierDetails};
 pub use summary::{
     AlgorithmSummary, CertificateSummary, ExtensionSummary, NameSummary, PublicKeySummary,
 };
@@ -205,6 +213,21 @@ fn check_limit(bytes: &[u8], options: ParseOptions) -> Result<(), Error> {
 /// Syntactic parsing does not verify signatures, key points, extensions or trust.
 pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo, Error> {
     check_limit(bytes, options)?;
+    parse_der_with_names(bytes, options, &OidNames::default())
+}
+
+/// Inspect one DER certificate using a caller-owned OID name table.
+/// Results copy names and do not retain the table. Overrides affect presentation
+/// only, never decoder selection, key sizes or validation.
+///
+/// # Errors
+/// Returns the same input/syntax errors as [`parse_der`].
+pub fn parse_der_with_names(
+    bytes: &[u8],
+    options: ParseOptions,
+    names: &OidNames,
+) -> Result<CertificateInfo, Error> {
+    check_limit(bytes, options)?;
     let (rest, cert) = x509_parser::certificate::X509CertificateParser::new()
         .with_deep_parse_extensions(false)
         .parse(bytes)
@@ -248,15 +271,15 @@ pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo,
         *counts.entry(extension.oid.to_id_string()).or_insert(0usize) += 1;
     }
     Ok(CertificateInfo {
-        signature_algorithm: algorithms::inspect(&cert.signature_algorithm, true)?,
+        signature_algorithm: algorithms::inspect(&cert.signature_algorithm, true, names)?,
         der: bytes.to_vec(),
         version: cert
             .version()
             .0
             .checked_add(1)
             .ok_or(Error::InvalidCertificate)?,
-        subject: names::inspect_name(cert.subject()),
-        issuer: names::inspect_name(cert.issuer()),
+        subject: names::inspect_name(cert.subject(), names),
+        issuer: names::inspect_name(cert.issuer(), names),
         validity: Validity {
             not_before_unix: cert.validity().not_before.timestamp(),
             not_after_unix: cert.validity().not_after.timestamp(),
@@ -265,10 +288,10 @@ pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo,
         signature_value: cert.signature_value.data.to_vec(),
         signature_unused_bits: cert.signature_value.unused_bits,
         public_key: PublicKeyInfo {
-            algorithm: algorithms::inspect(&spki.algorithm, false)?,
+            algorithm: algorithms::inspect(&spki.algorithm, false, names)?,
             curve_name: curve_oid
                 .as_deref()
-                .and_then(algorithms::curve_name)
+                .and_then(|oid| names.get(oid))
                 .map(str::to_owned),
             curve_oid,
             key_size_bits,
@@ -284,7 +307,11 @@ pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo,
                 oid: extension.oid.to_id_string(),
                 critical: extension.critical,
                 duplicate: counts[&extension.oid.to_id_string()] > 1,
-                details: extensions::decode(&extension.oid.to_id_string(), extension.value),
+                details: extensions::decode_with_names(
+                    &extension.oid.to_id_string(),
+                    extension.value,
+                    names,
+                ),
                 value_der: extension.value.to_vec(),
             })
             .collect(),
@@ -303,6 +330,20 @@ pub fn parse_der(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo,
 /// or an error from [`parse_der`] for the decoded certificate.
 pub fn parse_pem(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo, Error> {
     check_limit(bytes, options)?;
+    parse_pem_with_names(bytes, options, &OidNames::default())
+}
+
+/// Inspect one PEM certificate with caller-owned presentation names.
+/// The input and name table are borrowed only for this call; output owns all data.
+///
+/// # Errors
+/// Returns the same budget, armor and certificate errors as [`parse_pem`].
+pub fn parse_pem_with_names(
+    bytes: &[u8],
+    options: ParseOptions,
+    names: &OidNames,
+) -> Result<CertificateInfo, Error> {
+    check_limit(bytes, options)?;
     let trimmed = bytes.trim_ascii();
     // RFC 7468 decoding validates matching boundaries and full consumption.
     // Unlike Console's former PEM helper, no extra block/text is silently ignored.
@@ -310,5 +351,5 @@ pub fn parse_pem(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo,
     if label != "CERTIFICATE" {
         return Err(Error::UnexpectedPemLabel);
     }
-    parse_der(&der, options)
+    parse_der_with_names(&der, options, names)
 }

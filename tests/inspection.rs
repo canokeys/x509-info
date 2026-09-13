@@ -379,7 +379,11 @@ fn summary_json_contract_matches_golden_without_raw_certificate_copies() {
 
 #[test]
 fn single_byte_mutation_smoke_keeps_certificate_parsing_panic_free() {
-    for pem in [DETAILS, include_bytes!("fixtures/pss.pem").as_slice()] {
+    for pem in [
+        DETAILS,
+        include_bytes!("fixtures/pss.pem").as_slice(),
+        include_bytes!("fixtures/locations.pem").as_slice(),
+    ] {
         let original = parse_pem(pem, ParseOptions::default()).unwrap().der;
         for index in 0..original.len() {
             for replacement in [0, 0x80, 0xff] {

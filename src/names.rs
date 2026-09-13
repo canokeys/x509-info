@@ -1,4 +1,5 @@
-use x509_parser::x509::X509Name;
+use crate::OidNames;
+use x509_parser::x509::{AttributeTypeAndValue, X509Name};
 
 /// One attribute in a relative distinguished name; no normalization or name matching.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,39 +32,27 @@ pub struct DistinguishedName {
     pub der: Vec<u8>,
 }
 
-pub(crate) fn inspect_name(name: &X509Name<'_>) -> DistinguishedName {
+pub(crate) fn inspect_attribute(
+    attr: &AttributeTypeAndValue<'_>,
+    names: &OidNames,
+) -> NameAttribute {
+    let oid = attr.attr_type().to_id_string();
+    NameAttribute {
+        label: names.get(&oid).map(str::to_owned),
+        oid,
+        value: attr.as_str().ok().map(str::to_owned),
+        value_tag: attr.attr_value().tag().0,
+        value_hex: hex::encode(attr.as_slice()),
+    }
+}
+
+pub(crate) fn inspect_name(name: &X509Name<'_>, names: &OidNames) -> DistinguishedName {
     DistinguishedName {
         display: name.to_string(),
         der: name.as_raw().to_vec(),
         rdns: name
             .iter_rdn()
-            .map(|rdn| {
-                rdn.iter()
-                    .map(|attr| {
-                        let oid = attr.attr_type().to_id_string();
-                        let label = match oid.as_str() {
-                            "2.5.4.3" => Some("CN"),
-                            "2.5.4.6" => Some("C"),
-                            "2.5.4.7" => Some("L"),
-                            "2.5.4.8" => Some("ST"),
-                            "2.5.4.10" => Some("O"),
-                            "2.5.4.11" => Some("OU"),
-                            "2.5.4.5" => Some("serialNumber"),
-                            "0.9.2342.19200300.100.1.25" => Some("DC"),
-                            "1.2.840.113549.1.9.1" => Some("emailAddress"),
-                            _ => None,
-                        }
-                        .map(str::to_owned);
-                        NameAttribute {
-                            oid,
-                            label,
-                            value: attr.as_str().ok().map(str::to_owned),
-                            value_tag: attr.attr_value().tag().0,
-                            value_hex: hex::encode(attr.as_slice()),
-                        }
-                    })
-                    .collect()
-            })
+            .map(|rdn| rdn.iter().map(|a| inspect_attribute(a, names)).collect())
             .collect(),
     }
 }
@@ -78,7 +67,7 @@ mod tests {
         // Name -> RDN -> CN attribute -> INTEGER, deliberately not a DirectoryString.
         let bytes = [0x30, 12, 0x31, 10, 0x30, 8, 6, 3, 85, 4, 3, 2, 1, 42];
         let (_, name) = X509Name::from_der(&bytes).unwrap();
-        let owned = inspect_name(&name);
+        let owned = inspect_name(&name, &OidNames::default());
         assert_eq!(owned.der, bytes);
         let attr = &owned.rdns[0][0];
         assert_eq!(attr.value, None);

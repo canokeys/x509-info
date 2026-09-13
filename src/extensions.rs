@@ -1,5 +1,8 @@
 use crate::names::inspect_name;
-use crate::NameAttribute;
+use crate::{
+    AccessDescription, AuthorityKeyIdentifier, DistributionPoint, NameAttribute, OidNames,
+};
+use x509_cert::der::Decode;
 use x509_parser::{
     asn1_rs::{BitString, FromDer, Oid},
     extensions as backend,
@@ -93,6 +96,22 @@ pub enum ExtensionDetails {
         /// Encoded path-length constraint, when present.
         path_len_constraint: Option<u32>,
     },
+    /// Subject Key Identifier octets in lowercase hex.
+    SubjectKeyIdentifier(String),
+    /// Authority Key Identifier fields; no issuer matching is performed.
+    AuthorityKeyIdentifier(AuthorityKeyIdentifier),
+    /// Authority Information Access entries, including OCSP/CA issuer locations.
+    AuthorityInfoAccess(Vec<AccessDescription>),
+    /// Subject Information Access entries, including CA repository locations.
+    SubjectInfoAccess(Vec<AccessDescription>),
+    /// Issuer Alternative Names, in encoded order.
+    IssuerAlternativeName(Vec<GeneralName>),
+    /// CRL Distribution Points; no CRL retrieval or revocation checks occur.
+    CrlDistributionPoints(Vec<DistributionPoint>),
+    /// Freshest CRL locations for delta CRLs; no CRL processing occurs.
+    FreshestCrl(Vec<DistributionPoint>),
+    /// Certificate policy OIDs and qualifiers; no policy evaluation is performed.
+    CertificatePolicies(Vec<crate::CertificatePolicy>),
     /// This library does not interpret this OID. Raw bytes remain available.
     Unsupported,
     /// A supported extension could not be decoded within this library's limits.
@@ -117,13 +136,13 @@ pub struct ExtensionInfo {
     pub details: ExtensionDetails,
 }
 
-fn general_name(name: &backend::GeneralName<'_>) -> GeneralName {
+pub(crate) fn general_name(name: &backend::GeneralName<'_>, names: &OidNames) -> GeneralName {
     use backend::GeneralName as B;
     match name {
         B::DNSName(s) => GeneralName::Dns((*s).into()),
         B::RFC822Name(s) => GeneralName::Email((*s).into()),
         B::URI(s) => GeneralName::Uri((*s).into()),
-        B::DirectoryName(n) => GeneralName::Directory(inspect_name(n).rdns),
+        B::DirectoryName(n) => GeneralName::Directory(inspect_name(n, names).rdns),
         B::RegisteredID(oid) => GeneralName::RegisteredId(oid.to_id_string()),
         B::IPAddress(bytes) => match bytes.len() {
             4 => GeneralName::Ip(
@@ -143,20 +162,32 @@ fn general_name(name: &backend::GeneralName<'_>) -> GeneralName {
     }
 }
 
-pub(crate) fn decode(oid: &str, bytes: &[u8]) -> ExtensionDetails {
-    decode_supported(oid, bytes).unwrap_or(ExtensionDetails::Malformed)
+#[cfg(test)]
+fn decode(oid: &str, bytes: &[u8]) -> ExtensionDetails {
+    decode_with_names(oid, bytes, &OidNames::default())
 }
 
-fn decode_supported(oid: &str, bytes: &[u8]) -> Option<ExtensionDetails> {
+pub(crate) fn decode_with_names(oid: &str, bytes: &[u8], names: &OidNames) -> ExtensionDetails {
+    decode_supported(oid, bytes, names).unwrap_or(ExtensionDetails::Malformed)
+}
+
+fn decode_supported(oid: &str, bytes: &[u8], names: &OidNames) -> Option<ExtensionDetails> {
     match oid {
-        "2.5.29.17" => {
+        "2.5.29.17" | "2.5.29.18" => {
             let (rest, san) = backend::SubjectAlternativeName::from_der(bytes).ok()?;
             if !rest.is_empty() || san.general_names.is_empty() {
                 return None;
             }
-            Some(ExtensionDetails::SubjectAlternativeName(
-                san.general_names.iter().map(general_name).collect(),
-            ))
+            let entries = san
+                .general_names
+                .iter()
+                .map(|n| general_name(n, names))
+                .collect();
+            Some(if oid == "2.5.29.17" {
+                ExtensionDetails::SubjectAlternativeName(entries)
+            } else {
+                ExtensionDetails::IssuerAlternativeName(entries)
+            })
         }
         "2.5.29.19" => {
             let (rest, bc) = backend::BasicConstraints::from_der(bytes).ok()?;
@@ -205,22 +236,69 @@ fn decode_supported(oid: &str, bytes: &[u8]) -> Option<ExtensionDetails> {
                 oids.iter()
                     .map(|oid| {
                         let oid = oid.to_id_string();
-                        let name = match oid.as_str() {
-                            "2.5.29.37.0" => Some("any_extended_key_usage"),
-                            "1.3.6.1.5.5.7.3.1" => Some("server_auth"),
-                            "1.3.6.1.5.5.7.3.2" => Some("client_auth"),
-                            "1.3.6.1.5.5.7.3.3" => Some("code_signing"),
-                            "1.3.6.1.5.5.7.3.4" => Some("email_protection"),
-                            "1.3.6.1.5.5.7.3.8" => Some("time_stamping"),
-                            "1.3.6.1.5.5.7.3.9" => Some("ocsp_signing"),
-                            _ => None,
-                        }
-                        .map(str::to_owned);
+                        let name = names.get(&oid).map(str::to_owned);
                         KeyPurpose { oid, name }
                     })
                     .collect(),
             ))
         }
+        "2.5.29.14" => {
+            let (rest, key) = backend::KeyIdentifier::from_der(bytes).ok()?;
+            if !rest.is_empty() {
+                return None;
+            }
+            Some(ExtensionDetails::SubjectKeyIdentifier(hex::encode(key.0)))
+        }
+        "2.5.29.35" => {
+            // The inspection backend accepts unconsumed optional-field content.
+            // Check the complete schema first, then retain its raw INTEGER octets.
+            x509_cert::ext::pkix::AuthorityKeyIdentifier::from_der(bytes).ok()?;
+            let (rest, aki) = backend::AuthorityKeyIdentifier::from_der(bytes).ok()?;
+            if !rest.is_empty() {
+                return None;
+            }
+            Some(ExtensionDetails::AuthorityKeyIdentifier(
+                AuthorityKeyIdentifier {
+                    key_identifier_hex: aki.key_identifier.as_ref().map(|k| hex::encode(k.0)),
+                    authority_cert_issuer: aki
+                        .authority_cert_issuer
+                        .as_ref()
+                        .map(|list| list.iter().map(|n| general_name(n, names)).collect()),
+                    authority_cert_serial_hex: aki.authority_cert_serial.map(hex::encode),
+                },
+            ))
+        }
+        "1.3.6.1.5.5.7.1.1" => {
+            x509_cert::ext::pkix::AuthorityInfoAccessSyntax::from_der(bytes).ok()?;
+            let (rest, aia) = backend::AuthorityInfoAccess::from_der(bytes).ok()?;
+            if !rest.is_empty() || aia.accessdescs.is_empty() {
+                return None;
+            }
+            Some(ExtensionDetails::AuthorityInfoAccess(
+                crate::locations::access(&aia.accessdescs, names),
+            ))
+        }
+        "1.3.6.1.5.5.7.1.11" => {
+            x509_cert::ext::pkix::SubjectInfoAccessSyntax::from_der(bytes).ok()?;
+            let (rest, sia) = backend::SubjectInfoAccess::from_der(bytes).ok()?;
+            if !rest.is_empty() || sia.accessdescs.is_empty() {
+                return None;
+            }
+            Some(ExtensionDetails::SubjectInfoAccess(
+                crate::locations::access(&sia.accessdescs, names),
+            ))
+        }
+        "2.5.29.31" | "2.5.29.46" => {
+            let points = crate::locations::distribution(bytes, names)?;
+            Some(if oid == "2.5.29.31" {
+                ExtensionDetails::CrlDistributionPoints(points)
+            } else {
+                ExtensionDetails::FreshestCrl(points)
+            })
+        }
+        "2.5.29.32" => Some(ExtensionDetails::CertificatePolicies(
+            crate::policies::decode(bytes, names)?,
+        )),
         _ => Some(ExtensionDetails::Unsupported),
     }
 }
@@ -236,6 +314,30 @@ mod tests {
             ("2.5.29.15", &[3, 2, 7, 0x80]),
             ("2.5.29.37", &[0x30, 5, 6, 3, 42, 3, 5]),
             ("2.5.29.17", &[0x30, 3, 0x82, 1, b'a']),
+            ("2.5.29.18", &[0x30, 3, 0x82, 1, b'a']),
+            ("2.5.29.14", &[4, 1, 42]),
+            ("2.5.29.32", &[0x30, 5, 0x30, 3, 6, 1, 42]),
+            ("2.5.29.35", &[0x30, 3, 0x80, 1, 42]),
+            (
+                "1.3.6.1.5.5.7.1.1",
+                &[
+                    0x30, 15, 0x30, 13, 6, 8, 43, 6, 1, 5, 5, 7, 48, 1, 0x86, 1, b'a',
+                ],
+            ),
+            (
+                "1.3.6.1.5.5.7.1.11",
+                &[
+                    0x30, 15, 0x30, 13, 6, 8, 43, 6, 1, 5, 5, 7, 48, 1, 0x86, 1, b'a',
+                ],
+            ),
+            (
+                "2.5.29.31",
+                &[0x30, 9, 0x30, 7, 0xa0, 5, 0xa0, 3, 0x86, 1, b'a'],
+            ),
+            (
+                "2.5.29.46",
+                &[0x30, 9, 0x30, 7, 0xa0, 5, 0xa0, 3, 0x86, 1, b'a'],
+            ),
         ];
         for (oid, bytes) in examples {
             assert_ne!(decode(oid, bytes), ExtensionDetails::Malformed);
@@ -253,6 +355,29 @@ mod tests {
             assert_eq!(decode(oid, &[5, 0]), ExtensionDetails::Malformed);
         }
         assert_eq!(decode("1.2.3.4", &[0xff]), ExtensionDetails::Unsupported);
+    }
+
+    #[test]
+    fn optional_fields_and_nested_sequences_do_not_hide_extra_objects() {
+        let cases: &[(&str, &[u8])] = &[
+            ("2.5.29.35", &[0x30, 2, 5, 0]),
+            ("2.5.29.31", &[0x30, 4, 0x30, 2, 5, 0]),
+            (
+                "1.3.6.1.5.5.7.1.1",
+                &[
+                    0x30, 17, 0x30, 15, 6, 8, 43, 6, 1, 5, 5, 7, 48, 1, 0x86, 1, b'a', 5, 0,
+                ],
+            ),
+            (
+                "1.3.6.1.5.5.7.1.11",
+                &[
+                    0x30, 17, 0x30, 15, 6, 8, 43, 6, 1, 5, 5, 7, 48, 1, 0x86, 1, b'a', 5, 0,
+                ],
+            ),
+        ];
+        for (oid, bytes) in cases {
+            assert_eq!(decode(oid, bytes), ExtensionDetails::Malformed, "{oid}");
+        }
     }
 
     #[test]

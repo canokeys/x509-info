@@ -1,4 +1,4 @@
-use crate::Error;
+use crate::{Error, OidNames};
 use pkcs1::der::Decode;
 use x509_parser::{asn1_rs::ToDer, x509::AlgorithmIdentifier};
 
@@ -54,39 +54,13 @@ pub struct AlgorithmInfo {
     pub pss: Option<PssParameters>,
 }
 
-pub(crate) fn curve_name(oid: &str) -> Option<&'static str> {
-    match oid {
-        "1.2.840.10045.3.1.7" => Some("P-256"),
-        "1.3.132.0.34" => Some("P-384"),
-        "1.3.132.0.35" => Some("P-521"),
-        "1.3.132.0.10" => Some("secp256k1"),
-        "1.2.156.10197.1.301" => Some("SM2"),
-        _ => None,
-    }
-}
-
 pub(crate) fn inspect(
     alg: &AlgorithmIdentifier<'_>,
     signature: bool,
+    names: &OidNames,
 ) -> Result<AlgorithmInfo, Error> {
     let oid = alg.algorithm.to_id_string();
-    let name = match oid.as_str() {
-        "1.2.840.113549.1.1.1" => Some("RSA"),
-        "1.2.840.113549.1.1.10" => Some("RSA-PSS"),
-        "1.2.840.10045.2.1" => Some("EC"),
-        "1.3.101.112" => Some("Ed25519"),
-        "1.3.101.113" => Some("Ed448"),
-        "1.2.840.113549.1.1.5" => Some("RSA-SHA1"),
-        "1.2.840.113549.1.1.11" => Some("RSA-SHA256"),
-        "1.2.840.113549.1.1.12" => Some("RSA-SHA384"),
-        "1.2.840.113549.1.1.13" => Some("RSA-SHA512"),
-        "1.2.840.10045.4.1" => Some("ECDSA-SHA1"),
-        "1.2.840.10045.4.3.2" => Some("ECDSA-SHA256"),
-        "1.2.840.10045.4.3.3" => Some("ECDSA-SHA384"),
-        "1.2.840.10045.4.3.4" => Some("ECDSA-SHA512"),
-        _ => None,
-    }
-    .map(str::to_owned);
+    let name = names.get(&oid).map(str::to_owned);
     let parameters_der = alg
         .parameters
         .as_ref()
@@ -123,7 +97,11 @@ pub(crate) fn inspect(
             // PSS SPKI parameters may be absent (unrestricted key); signature parameters may not.
             parameter_status = ParameterStatus::DecodeError;
         }
-    } else if matches!(oid.as_str(), "1.3.101.112" | "1.3.101.113") && parameters_der.is_some() {
+    } else if matches!(
+        oid.as_str(),
+        "1.3.101.110" | "1.3.101.111" | "1.3.101.112" | "1.3.101.113"
+    ) && parameters_der.is_some()
+    {
         parameter_status = ParameterStatus::DecodeError;
     }
     if oid == "1.2.840.10045.2.1" {
@@ -182,15 +160,16 @@ pub(crate) fn key_details(
             }
             rsa_bits(bytes).map(decoded).unwrap_or(failed)
         }
-        "1.3.101.112" => {
+        "1.3.101.110" | "1.3.101.112" => {
             if bytes.len() == 32 && unused == 0 {
                 decoded(255)
             } else {
                 failed
             }
         }
-        "1.3.101.113" => {
-            if bytes.len() == 57 && unused == 0 {
+        "1.3.101.111" | "1.3.101.113" => {
+            let encoded_length = if oid == "1.3.101.111" { 56 } else { 57 };
+            if bytes.len() == encoded_length && unused == 0 {
                 decoded(448)
             } else {
                 failed
@@ -198,8 +177,16 @@ pub(crate) fn key_details(
         }
         "1.2.840.10045.2.1" => {
             let bits: usize = match curve {
-                Some("1.2.840.10045.3.1.7" | "1.3.132.0.10" | "1.2.156.10197.1.301") => 256,
-                Some("1.3.132.0.34") => 384,
+                Some(
+                    "1.2.840.10045.3.1.7"
+                    | "1.3.132.0.10"
+                    | "1.2.156.10197.1.301"
+                    | "1.3.36.3.3.2.8.1.1.7",
+                ) => 256,
+                Some("1.2.840.10045.3.1.1") => 192,
+                Some("1.3.132.0.33") => 224,
+                Some("1.3.36.3.3.2.8.1.1.13") => 512,
+                Some("1.3.132.0.34" | "1.3.36.3.3.2.8.1.1.11") => 384,
                 Some("1.3.132.0.35") => 521,
                 _ => return (None, KeyDataStatus::Unparsed),
             };
@@ -228,7 +215,12 @@ mod tests {
     fn pss(params: Option<&[u8]>, signature: bool) -> AlgorithmInfo {
         let oid = Oid::from(&[1, 2, 840, 113549, 1, 1, 10]).unwrap();
         let params = params.map(|p| Any::from_der(p).unwrap().1);
-        inspect(&AlgorithmIdentifier::new(oid, params), signature).unwrap()
+        inspect(
+            &AlgorithmIdentifier::new(oid, params),
+            signature,
+            &OidNames::default(),
+        )
+        .unwrap()
     }
 
     #[test]
@@ -255,6 +247,40 @@ mod tests {
             assert_eq!(info.parameters_der.as_deref(), Some(bytes));
             assert_eq!(info.pss, None);
         }
+    }
+
+    #[test]
+    fn montgomery_and_additional_prime_curves_use_their_actual_encodings() {
+        assert_eq!(
+            key_details("1.3.101.110", None, &[0; 32], 0),
+            (Some(255), KeyDataStatus::Decoded)
+        );
+        assert_eq!(
+            key_details("1.3.101.111", None, &[0; 56], 0),
+            (Some(448), KeyDataStatus::Decoded)
+        );
+        assert_eq!(
+            key_details("1.3.101.111", None, &[0; 57], 0),
+            (None, KeyDataStatus::DecodeError)
+        );
+        for (oid, bits) in [
+            ("1.2.840.10045.3.1.1", 192usize),
+            ("1.3.132.0.33", 224),
+            ("1.3.36.3.3.2.8.1.1.7", 256),
+            ("1.3.36.3.3.2.8.1.1.11", 384),
+            ("1.3.36.3.3.2.8.1.1.13", 512),
+        ] {
+            let bytes = vec![2; 1 + bits.div_ceil(8)];
+            assert_eq!(
+                key_details("1.2.840.10045.2.1", Some(oid), &bytes, 0),
+                (Some(bits), KeyDataStatus::Decoded)
+            );
+        }
+        // A registry label for ML-DSA does not imply key-format or signature support.
+        assert_eq!(
+            key_details("2.16.840.1.101.3.4.3.17", None, &[0; 32], 0),
+            (None, KeyDataStatus::Unparsed)
+        );
     }
 
     #[test]
