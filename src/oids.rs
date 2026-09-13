@@ -1,5 +1,5 @@
 use oid_registry::{Oid, OidRegistry};
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr, sync::Arc};
 
 /// A name lookup received an invalid or noncanonical dotted-decimal OID.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
@@ -8,8 +8,9 @@ pub struct InvalidOid;
 
 /// Caller-owned OID presentation names, independent of parsing or trust policy.
 ///
-/// Default populates the upstream oid-registry crypto/X.500/X.509 tables plus a
-/// small set of application labels and newer standard OIDs. No mutable global
+/// Default uses the upstream oid-registry crypto/X.500/X.509 tables plus
+/// application labels and newer standard OIDs without copying the base names.
+/// Clones share an immutable base registry; caller overrides remain independent. No mutable global
 /// registry is used. Names can change across crate/database releases; use OIDs
 /// for program logic. Adding a name never enables a decoder or cryptographic operation.
 /// Pass this table to parse_der_with_names/parse_pem_with_names to customize output.
@@ -22,20 +23,17 @@ pub struct InvalidOid;
 /// ```
 #[derive(Clone, Debug)]
 pub struct OidNames {
-    names: BTreeMap<String, String>,
+    registry: Arc<OidRegistry<'static>>,
+    overrides: BTreeMap<String, String>,
 }
 
 impl Default for OidNames {
     fn default() -> Self {
         let registry = OidRegistry::default().with_crypto().with_x509().with_x500();
-        let mut names: BTreeMap<_, _> = registry
-            .iter()
-            .map(|(oid, entry)| (oid.to_id_string(), entry.sn().to_owned()))
-            .collect();
-        for (oid, name) in LABELS {
-            names.insert((*oid).into(), (*name).into());
+        Self {
+            registry: Arc::new(registry),
+            overrides: BTreeMap::new(),
         }
-        Self { names }
     }
 }
 
@@ -43,7 +41,17 @@ impl OidNames {
     /// Look up an exact canonical dotted-decimal OID. Unknown/invalid input returns None.
     /// The borrowed label lives as long as this table; parsed results copy it.
     pub fn get(&self, oid: &str) -> Option<&str> {
-        self.names.get(oid).map(String::as_str)
+        let parsed = canonical_oid(oid).ok()?;
+        self.overrides
+            .get(oid)
+            .map(String::as_str)
+            .or_else(|| {
+                LABELS
+                    .iter()
+                    .find(|(id, _)| *id == oid)
+                    .map(|(_, name)| *name)
+            })
+            .or_else(|| self.registry.get(&parsed).map(|entry| entry.sn()))
     }
 
     /// Add/override a label, returning the previous owned label if present.
@@ -56,22 +64,29 @@ impl OidNames {
         oid: &str,
         name: impl Into<String>,
     ) -> Result<Option<String>, InvalidOid> {
-        let mut arcs = oid.split('.');
-        let first = arcs.next().ok_or(InvalidOid)?;
-        let second: u64 = arcs
-            .next()
-            .ok_or(InvalidOid)?
-            .parse()
-            .map_err(|_| InvalidOid)?;
-        if !matches!(first, "0" | "1" | "2") || (first != "2" && second >= 40) {
-            return Err(InvalidOid);
-        }
-        let parsed = Oid::from_str(oid).map_err(|_| InvalidOid)?;
-        if parsed.to_id_string() != oid {
-            return Err(InvalidOid);
-        }
-        Ok(self.names.insert(oid.into(), name.into()))
+        canonical_oid(oid)?;
+        let previous = self.get(oid).map(str::to_owned);
+        self.overrides.insert(oid.into(), name.into());
+        Ok(previous)
     }
+}
+
+fn canonical_oid(oid: &str) -> Result<Oid<'static>, InvalidOid> {
+    let mut arcs = oid.split('.');
+    let first = arcs.next().ok_or(InvalidOid)?;
+    let second: u64 = arcs
+        .next()
+        .ok_or(InvalidOid)?
+        .parse()
+        .map_err(|_| InvalidOid)?;
+    if !matches!(first, "0" | "1" | "2") || (first != "2" && second >= 40) {
+        return Err(InvalidOid);
+    }
+    let parsed = Oid::from_str(oid).map_err(|_| InvalidOid)?;
+    if parsed.to_id_string() != oid {
+        return Err(InvalidOid);
+    }
+    Ok(parsed)
 }
 
 // Keep existing application labels stable. The upstream database supplies the
@@ -144,3 +159,53 @@ const LABELS: &[(&str, &str)] = &[
     ("1.3.6.1.5.5.7.48.2", "ca_issuers"),
     ("1.3.6.1.5.5.7.48.5", "ca_repository"),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn upstream_coverage_and_application_labels_are_preserved() {
+        let names = OidNames::default();
+        let registry = OidRegistry::default().with_crypto().with_x509().with_x500();
+        for (oid, entry) in registry.iter() {
+            let id = oid.to_id_string();
+            let expected = LABELS
+                .iter()
+                .find(|(key, _)| *key == id)
+                .map_or(entry.sn(), |(_, label)| *label);
+            assert_eq!(names.get(&id), Some(expected), "{id}");
+        }
+        for (oid, label) in LABELS {
+            assert_eq!(names.get(oid), Some(*label));
+        }
+    }
+
+    #[test]
+    fn overrides_return_previous_values_and_clones_are_independent() {
+        let mut names = OidNames::default();
+        // Exercise both an upstream-only name and an application alias.
+        let upstream = names
+            .registry
+            .keys()
+            .map(Oid::to_id_string)
+            .find(|id| !LABELS.iter().any(|(key, _)| key == id))
+            .unwrap();
+        for oid in [upstream.as_str(), "2.5.4.3", "1.2.3.4"] {
+            let previous = names.get(oid).map(str::to_owned);
+            assert_eq!(names.insert(oid, "first").unwrap(), previous);
+            let mut cloned = names.clone();
+            assert_eq!(
+                cloned.insert(oid, "second").unwrap().as_deref(),
+                Some("first")
+            );
+            assert_eq!(names.get(oid), Some("first"));
+            assert_eq!(cloned.get(oid), Some("second"));
+        }
+        for invalid in ["2.05.4.3", " 2.5.4.3", "3.1", "1.40", "1.2.", ""] {
+            assert_eq!(names.get(invalid), None);
+            assert!(names.insert(invalid, "invalid").is_err());
+        }
+        assert_eq!(OidNames::default().get("1.2.3.4"), None);
+    }
+}
