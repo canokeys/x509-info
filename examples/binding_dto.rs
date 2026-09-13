@@ -1,5 +1,5 @@
 //! Application-owned DTO mapping at a Rust/Dart boundary; no FRB dependency here.
-use x509_info::{parse_pem, ExtensionDetails, GeneralName, ParseOptions};
+use x509_info::{parse_pem_with_names, ExtensionDetails, GeneralName, OidNames, ParseOptions};
 
 // In a Console binding crate, expose this application type through FRB.
 #[derive(Debug)]
@@ -10,8 +10,15 @@ struct CertificateView {
 }
 
 fn certificate_view(pem: Vec<u8>) -> Result<CertificateView, x509_info::Error> {
-    let info = parse_pem(&pem, ParseOptions::default())?;
+    let names = OidNames::default();
+    let info = parse_pem_with_names(&pem, ParseOptions::default(), &names)?;
+    // Parsing copies data and labels; neither input nor configuration is retained.
+    drop(pem);
+    drop(names);
     let summary = info.summary();
+    // The same summary model also serves the export_json example.
+    drop(info);
+
     // UI policy belongs here: this view only needs DNS identities. A complete
     // inspector should also display unsupported/malformed/duplicate findings.
     let dns_names = summary

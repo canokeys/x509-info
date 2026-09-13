@@ -28,90 +28,32 @@ Algorithm enums do not promise firmware support. Enable metadata directories, ke
 ## Generic certificate package
 
 The owned `x509-info` model, configurable OID labels, common extension inspection,
-and local details/serialization/binding examples are implemented. The next work
-is consolidation, not expansion. Keep the crate and optional `canokey::x509`
-re-export as an internal application adapter over established format libraries.
-Independent publication is deferred; retain `publish = false` until actual usage
-supports the public contract. The stages below are planned, not implemented.
+and local details/serialization/binding examples are implemented. Consolidation
+X1-X3 is implemented with existing APIs, label coverage, decoded fields, raw data,
+error distinctions, and summary schema version 1 preserved. Keep the crate and
+optional `canokey::x509` re-export as an application adapter over established format
+libraries. Independent publication is deferred; retain `publish = false` until
+actual usage supports the public contract.
 
-### X1: Simplify OID lookup
+| Stage | Delivered | Acceptance |
+| --- | --- | --- |
+| X1: OID lookup | Upstream registry used directly; static compatibility labels and independent caller overrides; clones share only immutable base data | Full upstream/label coverage, canonical syntax, override previous values, clone independence, existing summary fixtures |
+| X2: Backend conversion | Direct backend GeneralName decoding in the RustCrypto bridge; one owned name projection; existing strict schema/CRL/policy decoding retained | Existing extension fixtures, relative CRL names, nested trailing-data rejection, unknown/malformed and raw-data preservation |
+| X3: Application boundary | Existing DTO/JSON examples use the same owned summary after dropping parsing inputs and configuration; usage/contracts/research clarify dependency reuse | Runnable examples without backend imports; unchanged serialization fixtures and all existing format examples retained |
 
-- Keep the public `OidNames` API caller-owned. Store the upstream `OidRegistry`
-  directly instead of copying its full database into a string map. Use upstream
-  lookup helpers where useful; retain only necessary label overrides and missing
-  entries. Separate presentation aliases from genuinely missing standard OIDs.
-- Preserve canonical OID validation, unknown lookup behavior, `insert` return
-  semantics, and current output labels. Labels remain presentation data; dotted
-  OIDs determine identity and never select decoders through a name lookup.
-- Document ownership precisely: no mutable application registry or retained caller
-  references. Dependency-owned immutable lookup tables are distinct from device
-  state. Audit DN display separately because it currently uses the backend's
-  default registry; do not silently change its formatting or customization scope.
+Verified on Rust 1.85.1: default/all-feature workspace tests including doctests
+(64/68 passed), formatting, strict workspace/all-target clippy, warning-free
+documentation, wasm build, dependency/license checks, all four certificate examples,
+and standalone package verification. The JSON example matches the existing golden
+fixture. These checks establish local compatibility, not hardware verification or
+consumer adoption.
 
-Acceptance: existing OID and summary fixtures remain unchanged; cover independent
-caller registries, override precedence/previous values, malformed OIDs, and unknown
-OIDs using existing tests where possible. Default construction no longer copies
-all upstream entries into owned strings. Candidate commit:
-`refactor(x509): reuse the upstream OID registry directly`.
-
-### X2: Reduce backend conversion glue
-
-- Continue using `x509-parser::extensions::GeneralName` for ASN.1 decoding and
-  project its borrowed values into the existing owned application types.
-- Simplify redundant parsing steps, including the RustCrypto-to-backend name
-  bridge where practical. Evaluate direct projection only if it reduces total
-  conversion logic without losing raw data or duplicating name handling.
-- Retain `x509-cert` where regression tests establish a need: strict nested schema
-  checks, relative CRL distribution-point names, and current policy decoding.
-  Remove a dependency path only when a simpler replacement passes those cases.
-- Preserve public types, errors, unknown/malformed distinctions, duplicate
-  extension reporting, raw data, and summary schema version 1. An unavoidable
-  observable change must be documented explicitly before implementation.
-
-Acceptance: existing valid/malformed extension and algorithm fixtures pass,
-including relative CRL names and nested trailing-data rejection. Add regression
-coverage only for behavior affected by the cleanup. Candidate commit:
-`refactor(x509): simplify certificate name conversion`.
-
-### X3: Validate the application boundary and document scope
-
-- Refine the existing binding DTO and structured export examples instead of
-  creating parallel examples. Both must use the same public application model
-  without importing backend ASN.1 types. Show that results survive dropping input
-  bytes and caller-owned OID configuration.
-- Keep the Rust model primary and Serde optional. JSON/CBOR/TOML serializers and
-  application DTO choices belong in examples/callers, not new library format APIs.
-  Preserve useful existing examples; the details example demonstrates fields,
-  rather than becoming a general certificate pretty-printer.
-- Update the package README, design, and ecosystem assessment with their distinct
-  responsibilities: usage, contracts, and evidence. Explain when direct use of
-  `x509-parser` or `x509-certificate-printer` is sufficient. Do not claim that owned
-  types, OID labels, or Serde support alone establish uniqueness.
-
-Acceptance: run the two application examples and verify existing serialization
-fixtures. They must demonstrate reusable field conversion and explicit ownership
-without transport, FRB, clocks, or global application state. Record any remaining
-backend-specific application glue as a concrete gap. Candidate commit:
-`docs(x509): clarify the application adapter boundary`.
-
-### Consolidation checks and stop conditions
-
-For Rust changes, run formatting, default/all-feature tests and doctests, strict
-workspace/all-target clippy, and warning-free public documentation builds. At the
-end, verify wasm, dependency boundaries, and standalone package contents/build.
-Reuse existing fixtures; this work does not establish hardware or consumer
-integration compatibility.
-
-Do not add more extensions, cryptography, output-format APIs, or a text-printing
-subsystem during consolidation. No consumer integration, publication, repository
-split, or upstream modification is included. Missing standard OIDs can be recorded
-as future upstream contribution candidates. Issuance, trust/chain validation,
-revocation fetching, and policy evaluation remain application responsibilities.
-
-Completion means simpler internals with preserved application contracts and two
-convincing local usage examples. Publication is a later decision based on real
-consumer usage and maintenance value, not OID counts or feature breadth. Resume
-the existing PIV milestones separately after this focused work.
+Further extension/cryptography/output-format APIs, a text-printing subsystem,
+consumer integration, publication, repository splitting, and upstream changes are
+outside this consolidation. Missing standard OIDs can become future upstream
+contribution candidates; new features require consumer demand. Issuance,
+trust/chain validation, revocation fetching, and policy evaluation remain
+application responsibilities. Resume the existing PIV milestones separately.
 
 ## Engineering and delivery
 

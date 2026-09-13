@@ -15,6 +15,45 @@ A generic X.509 parser or ASN.1 model already has strong alternatives. Owned str
 
 Keep the existing parser backend for the first iteration rather than switching merely to justify a new name. If the intended direction becomes certificate construction, DER round trips or a comprehensive RFC 5280 type model, use/evaluate RustCrypto `x509-cert` directly instead of expanding this adapter into another format implementation.
 
+## Consolidation assessment
+
+The implemented adapter reuses `x509-parser::extensions::GeneralName` for name
+decoding. Its own name enum supplies owned application values, not a second ASN.1
+parser. `x509_parser::objects` supplies OID short-name/description/abbreviation
+lookups over `oid-registry`; the short-name and description helpers accept a
+caller-owned registry. These helpers are usable without a mutable global registry.
+The backend DN formatter does use an immutable default table, which is separate
+from application/device lifecycle state.
+
+`OidNames` now retains the upstream registry directly, shared immutably between
+clones, plus independent caller overrides. Static compatibility labels preserve
+existing output; they include presentation aliases as well as entries missing
+upstream. OID table breadth is not a distinguishing parsing capability. Standard
+missing entries are candidates for future upstream contributions, not a reason
+to grow a parallel database.
+
+The inspected `x509-certificate-printer` 0.1.0 exposes `PrettyPrinter::pretty_print`
+and `to_pem`, returning strings. Its OID/name/extension formatting helpers are
+private; it does not expose the owned structured summary needed here. It is a
+reasonable direct dependency for applications needing certificate text. Our
+`details` example overlaps that use case and is a usage demonstration, not a
+separate printer product. Owned data and Serde alone also are not unique, as the
+alternatives below show.
+
+Keep this package unpublished as a small application adapter. Existing binding
+DTO and JSON export examples demonstrate the same summary model after dropping
+input, OID configuration, and full results, without backend imports. They establish
+local usability, not consumer adoption or market demand. Preserve current features
+while reducing glue; further extensions and release work require concrete demand.
+Retain RustCrypto strict schema/CRL/policy decoding: current regression fixtures
+cover nested trailing data and relative CRL names that prevent a blanket switch
+to the other backend. This is a scoped compatibility decision, not a claim about
+all versions or all behavior of either library.
+
+Sources: [GeneralName](https://docs.rs/x509-parser/0.18.1/x509_parser/extensions/enum.GeneralName.html),
+[objects](https://docs.rs/x509-parser/0.18.1/x509_parser/objects/index.html), and
+[printer source](https://docs.rs/crate/x509-certificate-printer/0.1.0/source/src/lib.rs).
+
 ## Evidence and method
 
 Queried the live crates.io API for X.509, certificate inspection, certificate metadata, and JSON/Serde-related packages. Recorded latest non-prerelease versions, features, declared MSRV, licenses and repository URLs. Inspected published source archives for `x509-cert`, `x509-certificate`, `picky-asn1-x509`, `synta-certificate`, `x509-certificate-printer`, `cert-dump` and `inspect-cert-chain`, plus the locally resolved `x509-parser` and the current workspace implementation.

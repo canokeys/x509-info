@@ -1,6 +1,6 @@
 //! Bounded file input and JSON output belong to the application.
 use std::io::Read;
-use x509_info::{parse_der, parse_pem, ParseOptions};
+use x509_info::{parse_der_with_names, parse_pem_with_names, OidNames, ParseOptions};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let options = ParseOptions::default();
@@ -14,11 +14,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         None => include_bytes!("../tests/fixtures/details.pem").to_vec(),
     };
+    let names = OidNames::default();
     let info = if input.trim_ascii().starts_with(b"-----BEGIN ") {
-        parse_pem(&input, options)?
+        parse_pem_with_names(&input, options, &names)?
     } else {
-        parse_der(&input, options)?
+        parse_der_with_names(&input, options, &names)?
     };
-    println!("{}", serde_json::to_string_pretty(&info.summary())?);
+    drop(input);
+    drop(names);
+    let summary = info.summary();
+    drop(info);
+    // The owned summary can be serialized after all parsing inputs are released.
+    println!("{}", serde_json::to_string_pretty(&summary)?);
     Ok(())
 }

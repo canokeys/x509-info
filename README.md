@@ -5,6 +5,13 @@ transport, bindings and runtime state. Callers own inputs and results. This crat
 turns established parsers' types into certificate details that UI and reporting
 code can use without importing ASN.1 types or maintaining OID conversion tables.
 
+This is an application adapter, not another X.509 parser. Use `x509-parser`
+directly when its borrowed types already fit your Rust application; use
+`x509-certificate-printer` when you only need formatted certificate text. This
+crate supplies an owned field/summary contract for details views, binding DTOs,
+and structured exports. Those conveniences do not establish ecosystem uniqueness.
+Independent publication is deferred while actual consumer usage is evaluated.
+
 ## Use
 
 The experimental package is not yet published. From another local workspace:
@@ -60,9 +67,10 @@ checks the encoded interval; no clock, network, randomness or filesystem is acce
 
 ## OID names and caller customization
 
-`OidNames::default()` loads the upstream `oid-registry` crypto/X.500/X.509 tables,
-then applies application labels and selected newer standard names. The table covers
-more DN attributes (surname, givenName, title, UID), key purposes (IPsec/IKE and
+`OidNames::default()` loads the upstream `oid-registry` crypto/X.500/X.509 tables
+directly, with static application labels and selected newer standard names taking
+precedence. It does not copy the upstream database into a second string map.
+The table covers more DN attributes (surname, givenName, title, UID), key purposes (IPsec/IKE and
 Microsoft smart-card logon), SHA-224/SHA-3 signatures, hash algorithms, prime curves,
 and ML-DSA algorithm identifiers. Unknown OIDs remain available with absent labels.
 
@@ -78,11 +86,16 @@ let info = parse_der_with_names(&der, ParseOptions::default(), &names)?;
 also usable independently to label extension, hash or private-policy OIDs. `insert`
 validates canonical dotted-decimal syntax, including the first two arcs. No mutable
 global registry or callback lifecycle exists. The ordinary parse functions create
-one default table per call; reuse a table for repeated inspection.
+one default table per call; reuse a table for repeated inspection. Clones share
+only the immutable upstream registry; their custom overrides remain independent.
+Lookup precedence is caller overrides, built-in labels, then upstream short names.
+For example, `RSA` is a presentation alias, while ML-DSA identifiers supplement
+this upstream snapshot; neither kind of label supplies parsing functionality.
 
 Overrides affect structured attribute/algorithm/curve/purpose/access/policy labels;
 the backend-generated DN `display` string remains presentation text independent of
-these overrides. Labels are not stable identifiers, sanitized markup, decoder
+these overrides. That formatting uses the backend's immutable default lookup table,
+not caller/device state. Labels are not stable identifiers, sanitized markup, decoder
 registrations or algorithm-support claims. Adding an ML-DSA name does not enable
 ML-DSA key decoding or signature verification. Program logic should use OIDs.
 
@@ -163,21 +176,24 @@ cargo run -p x509-info --features serde --example export_formats --locked
 `details` displays common information; `export_json` owns bounded file reads and JSON
 output. Both use only the public model, with no backend parser imports. `binding_dto`
 shows a Console-style Rust adapter owning its input and returning application DTOs
-that outlive all parser data. An actual FRB integration exposes the adapter DTOs to
-Dart and maps typed errors in that binding crate. Dart owns the returned values;
+that outlive all parser data. Both it and `export_json` use `CertificateSummary`
+after explicitly dropping the input, OID configuration, and full certificate
+result. An actual FRB integration exposes the adapter DTOs to Dart and maps typed errors in that binding crate. Dart owns the returned values;
 no Rust registry, handle lifecycle or JSON round trip is required. FRB itself stays
 outside this crate.
 
 ## Dependencies and support
 
 Rust 1.85 or later is required; native and wasm32-unknown-unknown builds are checked.
-`x509-parser` and `pem-rfc7468` parse certificates/PEM; `pkcs1` decodes RSA/PSS;
+`x509-parser` and `pem-rfc7468` parse certificates/PEM; backend `GeneralName`
+decoding is projected into owned names rather than implemented again.
+`pkcs1` decodes RSA/PSS;
 `x509-cert` supplies strict AKI/AIA/SIA schema checks and CRL/policy structures;
 `oid-registry` supplies the base name tables; `sha2` computes fingerprints;
 `hex` formats bytes; `thiserror` supplies typed errors.
 `serde` is optional; format serializers are only example/test dependencies. There is no
 signature-verification backend or async runtime. This package has its own version
-within the workspace and remains unpublished while release metadata is finalized.
+within the workspace and remains unpublished pending evidence from consumer usage.
 
 Original code is Apache-2.0, authored by canokeys.org. The packaged LICENSE covers
 original code; LICENSE.console retains the MIT notice for adapted Console code.
