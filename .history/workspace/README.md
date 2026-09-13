@@ -93,8 +93,10 @@ cargo run -p canokey --features serde --example inspect_certificate --locked
 cargo run -p canokey --features serde --example inspect_certificate --locked -- certificate.pem
 ```
 
-`info.summary()` provides structured DN attributes, SAN/KU/EKU/Basic Constraints,
-algorithm details and a SHA-256 fingerprint. The summary JSON uses lowercase hex,
+`info.summary()` provides structured DN attributes, identities/usages/constraints,
+key identifiers, access/CRL locations, policies, algorithm details and a SHA-256
+fingerprint. Caller-owned OID tables can add or override presentation names.
+The summary JSON uses lowercase hex,
 Unix seconds and explicit unknown/malformed states, omitting large raw encodings.
 `CertificateInfo` retains original data. FRB adapters map owned values to application
 DTOs without a JSON round trip or global registry. Parsing establishes neither
@@ -102,7 +104,9 @@ signature validity nor trust; PIV certificate unwrapping remains a separate oper
 
 See the [x509-info README](crates/x509-info/README.md) for the schema, supported
 algorithms, limitations and standalone `details`, `export_json` and `binding_dto`
-examples. They run independently of the CanoKey facade and import no backend types.
+examples, plus `export_formats` for CBOR and caller-defined TOML output. Serializers
+are application choices and remain dev-dependencies. The examples run independently
+of the CanoKey facade and import no backend types.
 
 ## Rust API documentation
 

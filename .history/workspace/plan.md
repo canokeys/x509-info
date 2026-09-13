@@ -27,16 +27,18 @@ Algorithm enums do not promise firmware support. Enable metadata directories, ke
 
 ## Generic certificate package
 
-The initial `x509-info` application model and local details/JSON/binding examples
-are implemented. It has an independent package version and retains the facade
+The `x509-info` application model, configurable OID labels, expanded identifier/
+location/policy extensions and local details/JSON/CBOR/TOML/binding examples are
+implemented. It has an independent package version and retains the facade
 re-export. No consumer repository is integrated. Remaining release work: finalize
 repository/documentation URLs and publication policy, then explicitly release the
 package. `publish = false` remains intentional; implementation does not publish it.
 
 Acceptance: native/default/all-feature tests, malformed and duplicate extension
 coverage, unknown algorithm handling, stable summary golden data, caller-owned DTO
-example, wasm build and standalone package verification. Broader extensions follow
-consumer demand; issuance, chain validation and network access remain out of scope.
+example, wasm build and standalone package verification. Remaining extension
+candidates include structured UserNotice, Name Constraints and Policy Constraints;
+implement them by consumer demand rather than adding policy evaluation. Issuance, chain validation and network access remain out of scope.
 
 ## Engineering and delivery
 

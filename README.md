@@ -36,13 +36,19 @@ optional `canokey::x509` facade re-exports this crate; no CanoKey crate is a dep
 - Subject/issuer text and ordered RDN groups, including repeated and unknown attributes.
 - Version, original serial bytes, explicit validity timestamps and SHA-256 fingerprint.
 - Algorithm OIDs and common labels; RSA sizes, selected named EC curves, Ed25519/Ed448,
-  RSA-PSS parameters/defaults and separate parameter/key-encoding status.
-- SAN (DNS, email, IP, URI, directory name and registered ID), KU, EKU and Basic Constraints.
+  RSA-PSS parameters/defaults, X25519/X448 and separate parameter/key-encoding status.
+- SAN/IAN (DNS, email, IP, URI, directory name and registered ID), KU, EKU and Basic Constraints.
+- SKI/AKI, AIA/SIA access methods and locations, CRL Distribution Points and Freshest CRL.
+- Certificate Policies with CPS URIs and preserved UserNotice/private qualifier encodings.
 - Raw certificate/name/SPKI/signature/extension data, unknown OIDs and duplicate extension flags.
 
 Unsupported extensions stay `Unsupported`; failed supported extension decoding stays
 `Malformed`. Every duplicate OID occurrence is marked, with no first/last-wins policy.
-Invalid SAN entries remain visible individually. A malformed supported key encoding
+Invalid SAN entries remain visible individually. AKI/AIA/SIA receive complete-schema
+checks, and CRL/policy decoding uses RustCrypto types to retain relative CRL names and
+reject unconsumed nested data. `Malformed` indicates a supported extension could not
+be decoded within the backend's representation (including nested GeneralName/serial
+limits); it is not a comprehensive certificate-validity verdict. A malformed supported key encoding
 is distinct from an unrecognized algorithm/curve. These findings are not trust decisions.
 
 The parser accepts exactly one bounded DER/PEM certificate (default 1 MiB encoded
@@ -52,11 +58,53 @@ copies. Parsing does not verify signatures, chains, identities, revocation, crit
 extension policy or mathematical key validity. `validity.contains(timestamp)` only
 checks the encoded interval; no clock, network, randomness or filesystem is accessed.
 
+## OID names and caller customization
+
+`OidNames::default()` loads the upstream `oid-registry` crypto/X.500/X.509 tables,
+then applies application labels and selected newer standard names. The table covers
+more DN attributes (surname, givenName, title, UID), key purposes (IPsec/IKE and
+Microsoft smart-card logon), SHA-224/SHA-3 signatures, hash algorithms, prime curves,
+and ML-DSA algorithm identifiers. Unknown OIDs remain available with absent labels.
+
+```rust
+use x509_info::{parse_der_with_names, OidNames, ParseOptions};
+let mut names = OidNames::default();
+names.insert("1.2.3.7", "Internal access endpoint")?;
+// Reuse names across calls; results copy labels and never retain this reference.
+let info = parse_der_with_names(&der, ParseOptions::default(), &names)?;
+```
+
+`parse_pem_with_names` provides the same ownership contract for PEM. `get(oid)` is
+also usable independently to label extension, hash or private-policy OIDs. `insert`
+validates canonical dotted-decimal syntax, including the first two arcs. No mutable
+global registry or callback lifecycle exists. The ordinary parse functions create
+one default table per call; reuse a table for repeated inspection.
+
+Overrides affect structured attribute/algorithm/curve/purpose/access/policy labels;
+the backend-generated DN `display` string remains presentation text independent of
+these overrides. Labels are not stable identifiers, sanitized markup, decoder
+registrations or algorithm-support claims. Adding an ML-DSA name does not enable
+ML-DSA key decoding or signature verification. Program logic should use OIDs.
+
+Key encoding/nominal size inspection covers RSA/RSA-PSS, Ed25519/Ed448, X25519/X448,
+P-192/224/256/384/521, secp256k1, SM2 and brainpoolP256r1/P384r1/P512r1. Other registry
+curve names can still be displayed while size remains unknown. Recognition does
+not recommend an algorithm or establish mathematical key validity.
+
+OID references: [upstream registry](https://docs.rs/oid-registry/0.8.1/oid_registry/),
+[RFC 5280](https://www.rfc-editor.org/rfc/rfc5280.html) for names/extensions,
+[RFC 8410](https://www.rfc-editor.org/rfc/rfc8410.html) for Ed/Montgomery keys,
+[RFC 5639](https://www.rfc-editor.org/rfc/rfc5639.html) for brainpool,
+and [NIST algorithm registrations](https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration)
+for SHA-3 and ML-DSA names. The registry snapshot and crate version determine label coverage.
+
 ## Summary contract
 
 `info.summary()` returns `CertificateSummary`, whose optional Serde representation
 has `schema_version: 1`. It omits full DER, raw key/signature/parameter/extension bytes.
-Keep `CertificateInfo` when the application needs those encodings. Full-result Serde
+Keep `CertificateInfo` when the application needs those encodings. Policy qualifier
+value DER remains as hex in the summary so an unparsed UserNotice/private qualifier
+is not discarded; only CPS URI is decoded into a dedicated qualifier variant. Full-result Serde
 is also available, but is a diagnostic representation tied to crate SemVer, not the
 versioned summary contract.
 
@@ -80,6 +128,26 @@ up to 255 and trailer field 1. Other encodings produce `DecodeError` with raw
 parameters retained; that status does not by itself prove an invalid certificate.
 Explicit EC parameters and unrecognized algorithm parameters remain unparsed.
 
+## Other serialization formats
+
+The optional feature supplies `Serialize`, not a built-in JSON engine. Applications
+can choose any compatible Serde serializer without changing this crate. CBOR is
+tested against the same data model as JSON, including nulls, enum tags, locations
+and policies. The summary's hex strings remain strings in CBOR; use an application
+DTO/newtype if a different byte representation is required.
+
+TOML cannot represent arbitrary nulls, so the `export_formats` example uses a small
+application-owned inventory DTO with selected/renamed fields and omitted None
+values. The same approach supports custom JSON, CSV records or schema-based formats.
+A caller cannot implement an external trait on an external result type directly
+because of Rust's orphan rules; define a local DTO or newtype instead.
+
+No `Deserialize` implementation is promised for certificate results. The format
+tests deserialize into application/generic value types, not trusted certificates.
+Import actual certificates through DER/PEM parsing. `ciborium`, `toml` and
+`serde_json` are dev-dependencies for examples/tests only, not normal library
+features or runtime requirements.
+
 ## Executable examples
 
 Run from the repository root:
@@ -89,6 +157,7 @@ cargo run -p x509-info --example details --locked
 cargo run -p x509-info --features serde --example export_json --locked
 cargo run -p x509-info --features serde --example export_json --locked -- certificate.pem
 cargo run -p x509-info --example binding_dto --locked
+cargo run -p x509-info --features serde --example export_formats --locked
 ```
 
 `details` displays common information; `export_json` owns bounded file reads and JSON
@@ -103,8 +172,10 @@ outside this crate.
 
 Rust 1.85 or later is required; native and wasm32-unknown-unknown builds are checked.
 `x509-parser` and `pem-rfc7468` parse certificates/PEM; `pkcs1` decodes RSA/PSS;
-`sha2` computes fingerprints; `hex` formats bytes; `thiserror` supplies typed errors.
-`serde` is optional and `serde_json` is only an example/test dependency. There is no
+`x509-cert` supplies strict AKI/AIA/SIA schema checks and CRL/policy structures;
+`oid-registry` supplies the base name tables; `sha2` computes fingerprints;
+`hex` formats bytes; `thiserror` supplies typed errors.
+`serde` is optional; format serializers are only example/test dependencies. There is no
 signature-verification backend or async runtime. This package has its own version
 within the workspace and remains unpublished while release metadata is finalized.
 

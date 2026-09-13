@@ -33,6 +33,7 @@ jobs:
       - run: cargo run -p x509-info --example details --locked
       - run: cargo run -p x509-info --features serde --example export_json --locked
       - run: cargo run -p x509-info --example binding_dto --locked
+      - run: cargo run -p x509-info --features serde --example export_formats --locked
       - if: runner.os == 'Linux'
         run: cargo package -p x509-info --locked
       - run: cargo run -p canokey --example probe --locked

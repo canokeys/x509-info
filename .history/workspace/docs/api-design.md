@@ -130,13 +130,19 @@ File I/O, private-key PEM/PKCS#8 import, CSR/X.509 policy, PKCS#11 padding/KDF a
 | Validity | Signed Unix-second bounds; `contains(timestamp)` takes an explicit caller timestamp |
 | Serial/signature | Original serial INTEGER bytes and signature BIT STRING bytes/unused-bit count; signature algorithm OID, label and decoded RSA-PSS parameters |
 | Public key | Algorithm/curve OIDs, complete SPKI DER, raw key bytes, optional algorithm-specific size, key/parameter inspection status, separate encoded bit count |
-| Extensions | OID, critical/duplicate flags, raw inner bytes and decoded SAN/KU/EKU/Basic Constraints in certificate order |
+| Extensions | OID, critical/duplicate flags, raw inner bytes and decoded identities, usage, constraints, identifiers, access locations, CRL points and policies in certificate order |
 
 Unknown key algorithms remain inspectable without inventing their size. This differs from Console's old fallback of encoded bytes times eight. Known EC size comes from its named curve (so P-521 remains 521, not 528); RSA size excludes INTEGER sign padding. Inspection does not validate EC points, verify signatures, process critical-extension policy, build chains or establish trust. Raw DER is retained for richer application processing.
 
 `summary()` produces a separate owned `CertificateSummary` with SHA-256, application fields and no full DER/key/signature/extension copies. Optional Serde exposes schema version 1: lowercase hex byte strings, Unix seconds, dotted OIDs, null optional values and tagged extension/name choices. Full-result Serde retains numeric byte arrays for diagnostics. The detailed representation and supported algorithms are maintained in the [package README](../crates/x509-info/README.md). Result structs/enums are non-exhaustive where expansion is expected.
 
 Supported extension decoding failures are `Malformed`; unhandled OIDs are `Unsupported`. All occurrences of a repeated extension OID are marked `duplicate`; no occurrence is silently selected. These findings do not enforce RFC 5280 policy. Key encoding and algorithm parameter status are separate; unknown algorithms do not become malformed key errors. RSA-PSS is decoded by `pkcs1` within its documented salt/trailer representation, with raw parameters preserved on failure. Fingerprints use `sha2`, not local cryptography.
+
+OID names come from a caller-owned `OidNames` table backed by `oid-registry`, with selected application labels. `parse_der_with_names`/`parse_pem_with_names` borrow it only during the call and copy result labels. Overrides never select decoders or change key sizes. Default entry points create a local default table; no global registry is introduced. Registry coverage and supported key encodings are documented in the package README.
+
+AKI/AIA/SIA use complete-schema checks to prevent ignored nested content; CRL distribution points and policies use RustCrypto `x509-cert` structures. The two format libraries serve different inspection/strict-decoding responsibilities. Full and relative CRL names, reasons and issuers remain explicit; no URL is fetched. Policies retain qualifier DER and decode CPS URIs, leaving UserNotice/private values unparsed. Summary schema 1 permits these additive enum variants.
+
+Serde remains format-neutral. CBOR can serialize the summary directly; TOML/custom layouts use caller-owned DTOs. Serializer crates are dev-dependencies only. No certificate-result Deserialize or cross-format round-trip guarantee is added.
 
 FRB uses explicit application DTO mapping and does not require JSON. There is no new operation, result handle, cache or global state. macOS certificate eligibility, CSR/self-signed issuance policy, mixed private-key import, and QR/image decoding stay in Console.
 
@@ -176,7 +182,7 @@ Use established libraries for standard cryptography and standard key formats. Th
 | Need | Dependency direction | Boundary and status |
 | --- | --- | --- |
 | Typed errors | `thiserror` | Used for protocol and X.509 errors; preserves public kinds/fields and redacted Display. `anyhow` may aggregate application errors but is not a public core error type |
-| Certificate inspection | `x509-parser` with default features disabled, `pem-rfc7468`, `pkcs1`, `sha2`, and `hex` | Used by optional x509-info, following Console; no signature-verification backend, transport, or OS RNG |
+| Certificate inspection | `x509-parser`, `x509-cert`, `oid-registry`, `pem-rfc7468`, `pkcs1`, `sha2`, and `hex` | Used by optional x509-info, following Console; no signature-verification backend, transport, or OS RNG |
 | Result serialization | Optional `serde` | Owned certificate structs derive Serialize; JSON library choice stays in the application |
 | Secret erasure | `zeroize` / `Zeroizing` | Already used by protocol. `SecretBytes` adds redacted Debug and wipes old allocations during growth; replacing that behavior requires equivalent guarantees |
 | Certificate gzip | `flate2` with `rust_backend` and default features disabled | Already used by PIV. The applet layer still enforces input/output bounds, container rules, and trailing-data rejection |

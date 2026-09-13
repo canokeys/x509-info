@@ -22,3 +22,18 @@ for root in roots:
             raise SystemExit(f"forbidden dependency: {packages[root]['name']} -> {name}")
         pending.extend(nodes[pid]["dependencies"])
 print(f"dependency boundaries verified for {len(roots)} core crates")
+
+# Serializer implementations belong to consumers/examples, never the normal
+# x509-info dependency closure. Include build edges, but exclude dev-only edges.
+x509_root = next(pid for pid in roots if packages[pid]["name"] == "x509-info")
+pending, visited = [x509_root], set()
+while pending:
+    pid = pending.pop()
+    if pid in visited:
+        continue
+    visited.add(pid)
+    if packages[pid]["name"] in {"serde_json", "ciborium", "toml"}:
+        raise SystemExit(f"serializer leaked into library dependencies: {packages[pid]['name']}")
+    pending.extend(dep["pkg"] for dep in nodes[pid]["deps"]
+                   if any(kind["kind"] != "dev" for kind in dep["dep_kinds"]))
+print("certificate serializers remain outside normal library dependencies")

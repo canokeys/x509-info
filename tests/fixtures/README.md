@@ -29,3 +29,15 @@ certificates are intentionally invalid; inspection does not verify them.
 DER. `details.json` is a reviewed schema-v1 summary snapshot, checked alongside
 explicit field assertions. No fixture requires network, randomness or OpenSSL
 at test runtime. Regenerating random keys changes fingerprints and the snapshot.
+
+`locations.pem` (49) has fixed 2025-2030 validity, givenName/surname, SKI,
+AKI with issuer and serial 128 (including its sign-padding octet), AIA with known
+and unknown methods, SIA, IAN, full/relative CRL names with reasons and issuer,
+and a delta-CRL location. All URLs use reserved example.invalid names and are
+never fetched. It is synthetic, generated with Python cryptography; no private
+key was saved. The relative-name encoding is a regression fixture for a backend
+that otherwise reports that field as absent.
+
+`policies.pem` (50), generated the same way, includes anyPolicy plus a private
+policy with CPS URI and UserNotice. The notice remains raw/unparsed; tests verify
+that its bytes survive inspection and generic serialization.
