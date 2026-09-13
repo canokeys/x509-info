@@ -5,12 +5,9 @@ transport, bindings and runtime state. Callers own inputs and results. This crat
 turns established parsers' types into certificate details that UI and reporting
 code can use without importing ASN.1 types or maintaining OID conversion tables.
 
-This is an application adapter, not another X.509 parser. Use `x509-parser`
-directly when its borrowed types already fit your Rust application; use
-`x509-certificate-printer` when you only need formatted certificate text. This
-crate supplies an owned field/summary contract for details views, binding DTOs,
-and structured exports. Those conveniences do not establish ecosystem uniqueness.
-Independent publication is deferred while actual consumer usage is evaluated.
+Use `x509-parser` directly when its borrowed types fit your application, or
+`x509-certificate-printer` for formatted text. This adapter supplies owned data
+for details views, binding DTOs, and structured exports.
 
 ## Use
 
@@ -44,7 +41,8 @@ optional `canokey::x509` facade re-exports this crate; no CanoKey crate is a dep
 - Version, original serial bytes, explicit validity timestamps and SHA-256 fingerprint.
 - Algorithm OIDs and common labels; RSA sizes, selected named EC curves, Ed25519/Ed448,
   RSA-PSS parameters/defaults, X25519/X448 and separate parameter/key-encoding status.
-- SAN/IAN (DNS, email, IP, URI, directory name and registered ID), KU, EKU and Basic Constraints.
+- SAN/IAN (DNS, email, IP, URI, directory name, registered ID, OtherName, opaque
+  X.400/EDI names), KU, EKU and Basic Constraints.
 - SKI/AKI, AIA/SIA access methods and locations, CRL Distribution Points and Freshest CRL.
 - Certificate Policies with CPS URIs and preserved UserNotice/private qualifier encodings.
 - Raw certificate/name/SPKI/signature/extension data, unknown OIDs and duplicate extension flags.
@@ -111,13 +109,33 @@ OID references: [upstream registry](https://docs.rs/oid-registry/0.8.1/oid_regis
 and [NIST algorithm registrations](https://csrc.nist.gov/projects/computer-security-objects-register/algorithm-registration)
 for SHA-3 and ML-DSA names. The registry snapshot and crate version determine label coverage.
 
+## GeneralName representation
+
+All nine backend name choices have dedicated owned variants. `OtherName` retains
+its type OID, optional caller label, and hex-encoded bytes following the OID,
+including the expected explicit [0] value wrapper. The backend extracts the OID
+but does not validate that wrapper or decode OID-specific values.
+
+`X400Address` and `EdiPartyName` retain the constructed bit and content octets in
+lowercase hex. These are opaque values: `x509-parser` itself does not decode their
+inner fields. The outer context tags are [3] and [5]; exact original extension
+encoding remains in `ExtensionInfo::value_der`. Invalid names and invalid IP
+lengths retain the existing `Malformed(tag)` finding. `Unsupported(tag)` remains
+available for compatibility but is not emitted for the current backend choices.
+
+These variants also appear in summaries and Serde output as `other_name`,
+`x400_address`, and `edi_party_name`. They replace the former tag-only
+`unsupported` findings for these choices; consumers must handle the additional
+kinds allowed by schema version 1. Existing variants keep their representation.
+
 ## Summary contract
 
 `info.summary()` returns `CertificateSummary`, whose optional Serde representation
 has `schema_version: 1`. It omits full DER, raw key/signature/parameter/extension bytes.
 Keep `CertificateInfo` when the application needs those encodings. Policy qualifier
-value DER remains as hex in the summary so an unparsed UserNotice/private qualifier
-is not discarded; only CPS URI is decoded into a dedicated qualifier variant. Full-result Serde
+value DER and opaque GeneralName contents remain as hex in the summary so
+uninterpreted values are not discarded. Only CPS URI has a decoded policy qualifier
+variant. Full-result Serde
 is also available, but is a diagnostic representation tied to crate SemVer, not the
 versioned summary contract.
 

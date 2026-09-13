@@ -29,7 +29,33 @@ pub enum GeneralName {
     Directory(Vec<Vec<NameAttribute>>),
     /// Registered identifier in dotted-decimal notation.
     RegisteredId(String),
-    /// Unsupported GeneralName choice, identified by its context-specific tag.
+    /// OtherName type identifier and opaque value; no OID-specific decoder runs.
+    OtherName {
+        /// Dotted-decimal type-id OID.
+        oid: String,
+        /// Presentation label from the caller's registry, when available.
+        name: Option<String>,
+        /// Lowercase hex of bytes following type-id, including the expected `[0]`
+        /// explicit value wrapper. The backend does not validate that wrapper
+        /// or the inner value; these bytes may be empty or malformed.
+        value_der_hex: String,
+    },
+    /// Opaque X.400 address. The backend does not decode the ORAddress fields.
+    X400Address {
+        /// Constructed bit of the context-specific `[3]` header as encoded.
+        constructed: bool,
+        /// Lowercase hex of content octets, excluding the outer tag and length.
+        content_hex: String,
+    },
+    /// Opaque EDI party name. The backend does not decode its inner fields.
+    EdiPartyName {
+        /// Constructed bit of the context-specific `[5]` header as encoded.
+        constructed: bool,
+        /// Lowercase hex of content octets, excluding the outer tag and length.
+        content_hex: String,
+    },
+    /// Reserved unsupported choice, identified by its context-specific tag.
+    /// Retained for compatibility; current backend choices have dedicated variants.
     /// Its bytes remain in the containing extension's value_der.
     Unsupported(u32),
     /// Malformed GeneralName choice, including invalid IP lengths or text encodings.
@@ -155,9 +181,22 @@ pub(crate) fn general_name(name: &backend::GeneralName<'_>, names: &OidNames) ->
             ),
             _ => GeneralName::Malformed(7),
         },
-        B::OtherName(_, _) => GeneralName::Unsupported(0),
-        B::X400Address(_) => GeneralName::Unsupported(3),
-        B::EDIPartyName(_) => GeneralName::Unsupported(5),
+        B::OtherName(oid, value) => {
+            let oid = oid.to_id_string();
+            GeneralName::OtherName {
+                name: names.get(&oid).map(str::to_owned),
+                oid,
+                value_der_hex: hex::encode(value),
+            }
+        }
+        B::X400Address(any) => GeneralName::X400Address {
+            constructed: any.header.is_constructed(),
+            content_hex: hex::encode(any.data),
+        },
+        B::EDIPartyName(any) => GeneralName::EdiPartyName {
+            constructed: any.header.is_constructed(),
+            content_hex: hex::encode(any.data),
+        },
         B::Invalid(tag, _) => GeneralName::Malformed(tag.0),
     }
 }
@@ -406,7 +445,73 @@ mod tests {
         else {
             panic!("expected SAN")
         };
-        assert_eq!(names, [GeneralName::Unsupported(3)]);
+        assert_eq!(
+            names,
+            [GeneralName::X400Address {
+                constructed: true,
+                content_hex: String::new()
+            }]
+        );
+    }
+
+    #[test]
+    fn opaque_names_preserve_backend_data_and_caller_labels() {
+        let entries = {
+            // SAN: OtherName 1.2.3.4 with explicit UTF8 "a", opaque X.400,
+            // opaque EDI, and an OtherName whose value wrapper is absent.
+            let bytes = vec![
+                0x30, 25, 0xa0, 10, 6, 3, 42, 3, 4, 0xa0, 3, 12, 1, b'a', 0xa3, 2, 0x30, 0, 0xa5,
+                0, 0xa0, 5, 6, 3, 42, 3, 4,
+            ];
+            let mut names = OidNames::default();
+            names.insert("1.2.3.4", "Private identity").unwrap();
+            let ExtensionDetails::SubjectAlternativeName(entries) =
+                decode_with_names("2.5.29.17", &bytes, &names)
+            else {
+                panic!("expected SAN")
+            };
+            entries
+        }; // The input and caller registry no longer exist.
+        assert_eq!(
+            entries,
+            vec![
+                GeneralName::OtherName {
+                    oid: "1.2.3.4".into(),
+                    name: Some("Private identity".into()),
+                    value_der_hex: "a0030c0161".into(),
+                },
+                GeneralName::X400Address {
+                    constructed: true,
+                    content_hex: "3000".into()
+                },
+                GeneralName::EdiPartyName {
+                    constructed: true,
+                    content_hex: String::new()
+                },
+                GeneralName::OtherName {
+                    oid: "1.2.3.4".into(),
+                    name: Some("Private identity".into()),
+                    value_der_hex: String::new(),
+                },
+            ]
+        );
+        #[cfg(feature = "serde")]
+        {
+            let json = serde_json::to_value(&entries).unwrap();
+            assert_eq!(
+                json,
+                serde_json::json!([
+                    {"kind":"other_name","value":{"oid":"1.2.3.4","name":"Private identity","value_der_hex":"a0030c0161"}},
+                    {"kind":"x400_address","value":{"constructed":true,"content_hex":"3000"}},
+                    {"kind":"edi_party_name","value":{"constructed":true,"content_hex":""}},
+                    {"kind":"other_name","value":{"oid":"1.2.3.4","name":"Private identity","value_der_hex":""}}
+                ])
+            );
+            let mut cbor = Vec::new();
+            ciborium::into_writer(&entries, &mut cbor).unwrap();
+            let decoded: serde_json::Value = ciborium::from_reader(cbor.as_slice()).unwrap();
+            assert_eq!(decoded, json);
+        }
     }
 
     #[test]
