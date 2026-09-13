@@ -2,9 +2,8 @@
 //!
 //! This extracts the reusable DER/PEM inspection responsibility from Console's
 //! Rust `api/crypto.rs`. It uses the same `x509-parser` dependency, with owned
-//! typed results and bounded, strict single-certificate inputs. Adapted extraction
-//! code is covered by the upstream MIT notice in `LICENSE.console`; original
-//! additions are Apache-2.0. Source provenance is recorded in the workspace docs.
+//! typed results and bounded, strict single-certificate inputs. This crate is
+//! licensed under Apache-2.0.
 //!
 //! Parsing is not signature verification, chain building, trust, revocation, or
 //! application policy. No system clock or randomness is read. The caller supplies

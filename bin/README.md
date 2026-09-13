@@ -6,7 +6,7 @@ file/standard I/O and serializers. The library has no I/O. No validity, trust, r
 is performed. Inner and outer signature algorithm fields are both retained.
 
 ```sh
-cargo install --path crates/x509-info --features cli --locked
+cargo install --path . --features cli --locked
 x509-info certificate.pem
 x509-info certificate.der --format json --output report.json
 x509-info certificate.pem --format yaml --output report.yaml
@@ -21,7 +21,7 @@ cat certificate.pem | x509-info --format json > report.json
 ```
 
 Use `cargo run -p x509-info --features cli --locked --` instead of the installed command when
-working in this workspace. `--help` lists all arguments. The default encoded input
+working in this repository. `--help` lists all arguments. The default encoded input
 limit is 1 MiB; override it with `--max-input-bytes`. Multiple certificates and
 trailing input are rejected. Auto detection accepts surrounding PEM whitespace;
 `--input-format der|pem` explicitly selects an encoding. Paths are platform-native;

@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("binary", type=Path, help="Path to the built x509-info executable")
 args = parser.parse_args()
 binary = str(args.binary.resolve())
-fixtures = Path(__file__).resolve().parent.parent / "crates/x509-info/tests/fixtures"
+fixtures = Path(__file__).resolve().parent.parent / "tests/fixtures"
 
 
 def run(*arguments):

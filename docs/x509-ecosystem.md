@@ -2,7 +2,7 @@
 
 Sources inspected on 2026-09-13. Comparisons describe the listed releases, not all
 versions or wrappers; alternatives were not benchmarked. Current APIs and limits
-are documented in the [package README](../../crates/x509-info/README.md).
+are documented in the [package README](../README.md).
 
 ## Reuse boundary
 
@@ -20,8 +20,8 @@ replacement preserves their behavior.
 `x509-certificate-printer` exposes `PrettyPrinter::pretty_print` and `to_pem` as
 strings; formatting helpers are private. Use it directly for text output. The
 owned application/summary model is useful for typed bindings and serialization,
-but neither ownership nor Serde alone is unique. Publication remains deferred
-pending actual consumer usage.
+but neither ownership nor Serde alone is unique. The independent crate also
+provides a CLI with multiple report formats and type-derived report schemas.
 
 ## Main alternatives
 

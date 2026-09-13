@@ -8,7 +8,7 @@ x509-info --schema --output report.schema.json
 x509-info --schema --summary --output summary.schema.json
 ```
 
-From this workspace, prefix the arguments with
+From this repository, prefix the arguments with
 `cargo run -p x509-info --features cli --locked --`. Both schemas are self-contained:
 all references resolve within `$defs`; generating or validating them needs no
 network access. Their identifiers are `urn:x509-info:report:2:full` and

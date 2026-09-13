@@ -1,16 +1,19 @@
 [package]
 name = "x509-info"
 version = "0.1.0"
-edition.workspace = true
-rust-version.workspace = true
-authors.workspace = true
-license.workspace = true
-homepage.workspace = true
+edition = "2021"
+rust-version = "1.85"
+authors = ["canokeys.org"]
+license = "Apache-2.0"
+homepage = "https://github.com/Harry-Chen/x509-info"
+repository = "https://github.com/Harry-Chen/x509-info"
+documentation = "https://docs.rs/x509-info"
 description = "Owned X.509 certificate information for applications"
 readme = "README.md"
 keywords = ["x509", "certificate", "pem", "inspection"]
 categories = ["parser-implementations", "cryptography"]
-publish = false
+publish = ["crates-io"]
+include = ["lib/**", "bin/**", "tests/**", "examples/**", "docs/**", "scripts/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE"]
 
 [lib]
 path = "lib/mod.rs"
@@ -42,10 +45,13 @@ hex = "0.4"
 pkcs1 = { version = "0.7", default-features = false }
 x509-parser = { version = "0.18.1", default-features = false }
 pem-rfc7468 = { version = "1", default-features = false, features = ["alloc"] }
-thiserror.workspace = true
+thiserror = "2"
 serde = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 serde_json = "1"
 ciborium = "0.2"
 toml = "0.8"
+
+[package.metadata.docs.rs]
+all-features = true
