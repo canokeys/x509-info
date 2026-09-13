@@ -21,6 +21,9 @@
 //! These describe source representations. The optional CLI's `--schema` command
 //! additionally accounts for report field names, Base64 and UUID formatting.
 //!
+//! See [Ecosystem and dependency choices](#ecosystem-and-dependency-choices)
+//! for comparisons with other X.509 libraries.
+//!
 //! # Example
 //!
 //! ```
@@ -35,6 +38,7 @@
 //! assert!(subject.display.contains("libcanokey test certificate"));
 //! # Ok::<(), x509_info::Error>(())
 //! ```
+#![doc = include_str!("../docs/x509-ecosystem.md")]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
 

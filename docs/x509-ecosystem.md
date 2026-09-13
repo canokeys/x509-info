@@ -1,8 +1,8 @@
-# X.509 dependency choices
+# Ecosystem and dependency choices
 
 Sources inspected on 2026-09-13. Comparisons describe the listed releases, not all
 versions or wrappers; alternatives were not benchmarked. Current APIs and limits
-are documented in the [package README](../README.md).
+are documented in the [package README](https://github.com/canokeys/x509-info#library).
 
 ## Reuse boundary
 

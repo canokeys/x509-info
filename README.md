@@ -1,6 +1,6 @@
 # x509-info
 
-[![CI](https://github.com/Harry-Chen/x509-info/actions/workflows/ci.yml/badge.svg)](https://github.com/Harry-Chen/x509-info/actions/workflows/ci.yml)
+[![CI](https://github.com/canokeys/x509-info/actions/workflows/ci.yml/badge.svg)](https://github.com/canokeys/x509-info/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/x509-info.svg)](https://crates.io/crates/x509-info)
 [![docs.rs](https://docs.rs/x509-info/badge.svg)](https://docs.rs/x509-info)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
