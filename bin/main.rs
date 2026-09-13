@@ -1,6 +1,7 @@
 //! Command-line certificate inspection and format conversion. I/O stays here.
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
+mod encoding;
 mod report;
 use std::{
     io::{Read, Write},
@@ -97,10 +98,10 @@ fn run(args: Args) -> Result<()> {
                 .into_bytes()
         }
         OutputFormat::Text | OutputFormat::Json | OutputFormat::Cbor | OutputFormat::Toml => {
-            let value = report::inspect(&info, summary)?;
+            let value = encoding::binary(report::inspect(&info, summary)?)?;
             match format {
                 OutputFormat::Json => {
-                    let mut s = serde_json::to_vec_pretty(&value)?;
+                    let mut s = serde_json::to_vec_pretty(&encoding::textual(value)?)?;
                     s.push(b'\n');
                     s
                 }
@@ -110,9 +111,10 @@ fn run(args: Args) -> Result<()> {
                     out
                 }
                 OutputFormat::Toml => {
-                    toml::to_string_pretty(&report::toml_value(value)?)?.into_bytes()
+                    toml::to_string_pretty(&report::toml_value(encoding::textual(value)?)?)?
+                        .into_bytes()
                 }
-                OutputFormat::Text => report::text(&value).into_bytes(),
+                OutputFormat::Text => report::text(&encoding::textual(value)?).into_bytes(),
                 OutputFormat::Der | OutputFormat::Pem => unreachable!("handled above"),
             }
         }

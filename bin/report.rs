@@ -66,7 +66,7 @@ pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Va
         }
     }
     let mut value = json!({
-        "report_version": 1,
+        "report_version": 2,
         "certificate": certificate,
         "public_key_details": key,
         "spki_sha256_fingerprint_hex": hex::encode(info.public_key.spki_sha256_fingerprint()),

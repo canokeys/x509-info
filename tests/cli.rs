@@ -1,5 +1,7 @@
 #![cfg(feature = "cli")]
 
+use base64ct::Encoding;
+
 use std::{
     io::Write,
     process::{Command, Stdio},
@@ -26,8 +28,26 @@ fn success(args: &[&str], input: &[u8]) -> Vec<u8> {
 #[test]
 fn report_formats_and_encoding_roundtrips_preserve_fields() {
     let json: serde_json::Value = serde_json::from_slice(&success(&["-f", "json"], PEM)).unwrap();
-    assert_eq!(json["report_version"], 1);
-    assert!(json["certificate"]["der"].is_array());
+    assert_eq!(json["report_version"], 2);
+    let info = x509_info::parse_pem(PEM, Default::default()).unwrap();
+    assert_eq!(
+        base64ct::Base64::decode_vec(json["certificate"]["der_base64"].as_str().unwrap()).unwrap(),
+        info.der
+    );
+    assert!(json["certificate"].get("der").is_none());
+    assert_eq!(
+        json["certificate"]["serial_number_hex"],
+        hex::encode(&info.serial_number)
+    );
+    assert_eq!(
+        base64ct::Base64::decode_vec(
+            json["certificate"]["signature_value_base64"]
+                .as_str()
+                .unwrap()
+        )
+        .unwrap(),
+        info.signature_value
+    );
     assert_eq!(
         json["public_key_details"]["fields"]["kind"],
         "ec_uncompressed"
@@ -37,16 +57,44 @@ fn report_formats_and_encoding_roundtrips_preserve_fields() {
         64
     );
     let cbor = success(&["--format", "cbor"], PEM);
-    let decoded: serde_json::Value = ciborium::from_reader(cbor.as_slice()).unwrap();
-    assert_eq!(decoded, json);
+    let decoded: ciborium::Value = ciborium::from_reader(cbor.as_slice()).unwrap();
+    fn field<'a>(value: &'a ciborium::Value, name: &str) -> &'a ciborium::Value {
+        &value
+            .as_map()
+            .unwrap()
+            .iter()
+            .find(|(k, _)| k.as_text() == Some(name))
+            .unwrap()
+            .1
+    }
+    assert_eq!(
+        field(field(&decoded, "certificate"), "der")
+            .as_bytes()
+            .unwrap(),
+        &info.der
+    );
+    assert_eq!(
+        field(&decoded, "report_version").as_integer().unwrap(),
+        2.into()
+    );
     let text = String::from_utf8(success(&[], PEM)).unwrap();
     assert!(text.contains("tbs_signature_algorithm:"));
     assert!(text.contains("x_hex:"));
+    assert!(text.contains(&format!(
+        "der_base64: {}",
+        json["certificate"]["der_base64"]
+    )));
+    let full_toml: toml::Value =
+        toml::from_str(&String::from_utf8(success(&["-f", "toml"], PEM)).unwrap()).unwrap();
+    assert_eq!(
+        full_toml["certificate"]["der_base64"].as_str(),
+        json["certificate"]["der_base64"].as_str()
+    );
     let toml: toml::Value =
         toml::from_str(&String::from_utf8(success(&["--summary", "-f", "toml"], PEM)).unwrap())
             .unwrap();
     assert!(toml["certificate"].get("der").is_none());
-    assert_eq!(toml["report_version"].as_integer(), Some(1));
+    assert_eq!(toml["report_version"].as_integer(), Some(2));
     let der = success(&["-f", "der"], PEM);
     let pem = success(&["--input-format", "der", "-f", "pem"], &der);
     assert_eq!(success(&["-f", "der"], &pem), der);
@@ -147,4 +195,68 @@ fn clap_validates_arguments_and_documents_formats() {
         success(&["--format=der", "-"], PEM),
         success(&["-f", "der"], PEM)
     );
+}
+
+#[test]
+fn fido_uuid_and_unusual_lengths_survive_all_reports() {
+    use x509_cert::der::{
+        asn1::{ObjectIdentifier, OctetString},
+        Any, Decode, Encode, Tag, TagNumber,
+    };
+    let info = x509_info::parse_pem(PEM, Default::default()).unwrap();
+    let mut certificate = Vec::<Any>::from_der(&info.der).unwrap();
+    let mut tbs = Vec::<Any>::from_der(&certificate[0].to_der().unwrap()).unwrap();
+    let inputs = [
+        hex::decode("08987058cadc4b81b6e130de50dcbe96").unwrap(),
+        vec![0, 255],
+    ];
+    let extensions: Vec<_> = inputs
+        .iter()
+        .map(|bytes| x509_cert::ext::Extension {
+            extn_id: ObjectIdentifier::new("1.3.6.1.4.1.45724.1.1.4").unwrap(),
+            critical: false,
+            extn_value: OctetString::new(
+                OctetString::new(bytes.clone()).unwrap().to_der().unwrap(),
+            )
+            .unwrap(),
+        })
+        .collect();
+    tbs.pop().unwrap();
+    tbs.push(
+        Any::new(
+            Tag::ContextSpecific {
+                constructed: true,
+                number: TagNumber(3),
+            },
+            extensions.to_der().unwrap(),
+        )
+        .unwrap(),
+    );
+    certificate[0] = Any::from_der(&tbs.to_der().unwrap()).unwrap();
+    // Retain the old signature: reports parse assertions without verifying them.
+    let der = certificate.to_der().unwrap();
+    for summary in [false, true] {
+        let mut args = vec!["-f", "json"];
+        if summary {
+            args.push("--summary");
+        }
+        let value: serde_json::Value = serde_json::from_slice(&success(&args, &der)).unwrap();
+        let ext = &value["certificate"]["extensions"];
+        assert_eq!(
+            ext[0]["details"]["value"]["uuid"],
+            "08987058-cadc-4b81-b6e1-30de50dcbe96"
+        );
+        assert_eq!(ext[1]["details"]["value"]["raw_base64"], "AP8=");
+        assert_eq!(
+            ext[1]["details"]["value"]["format_diagnostic"]["issue"],
+            "invalid_length"
+        );
+    }
+    for format in ["text", "toml"] {
+        let output = String::from_utf8(success(&["-f", format], &der)).unwrap();
+        assert!(output.contains("08987058-cadc-4b81-b6e1-30de50dcbe96"));
+        assert!(output.contains("AP8="));
+        assert!(output.contains("invalid_length"));
+    }
+    assert_eq!(success(&["-f", "der"], &der), der);
 }

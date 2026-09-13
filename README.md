@@ -301,6 +301,7 @@ lib/
 bin/
   main.rs         clap arguments, bounded input and output
   report.rs       Report enrichment and text/JSON/CBOR/TOML rendering
+  encoding.rs     Base64/native byte fields and UUID display for CLI reports
   README.md       Command-line usage
 tests/            Integration tests and certificate fixtures
 examples/         Binding DTO example

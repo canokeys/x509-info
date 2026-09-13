@@ -38,7 +38,7 @@ while pending:
     if pid in visited:
         continue
     visited.add(pid)
-    if packages[pid]["name"] in {"clap", "serde_json", "ciborium", "toml"}:
+    if packages[pid]["name"] in {"clap", "serde_json", "ciborium", "toml", "uuid"}:
         raise SystemExit(f"serializer leaked into library dependencies: {packages[pid]['name']}")
     pending.extend(dep["pkg"] for dep in nodes[pid]["deps"]
                    if any(kind["kind"] != "dev" for kind in dep["dep_kinds"]))
