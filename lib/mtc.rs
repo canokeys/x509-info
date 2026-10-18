@@ -43,6 +43,16 @@ pub struct MtcCosignature {
     pub signature: Vec<u8>,
 }
 
+impl MtcCosignature {
+    /// The cosigner ID in dotted-decimal trust anchor ID notation, when the
+    /// binary form is valid. Presentation only; the raw bytes are authoritative.
+    pub fn cosigner_id_dotted(&self) -> Option<String> {
+        mtcs::TrustAnchorId::from_binary(&self.cosigner_id)
+            .ok()
+            .map(|id| id.to_dotted())
+    }
+}
+
 /// A decoded MTCProof structure from a certificate's signature value.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]

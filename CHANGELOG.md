@@ -15,7 +15,9 @@
   retained raw as `CertificateInfo::certificate_properties`. Duplicate block kinds
   and other labels remain errors.
 - CLI reports carry an optional `mtc` section and the properties block; the report
-  version is unchanged.
+  version is unchanged. Cosignatures in the report show both the raw cosigner ID
+  and its dotted presentation, and `MtcCosignature::cosigner_id_dotted` exposes it
+  in the library.
 - MTC wire-format parsing is delegated to the `mtcs` crate's no-cryptography base
   layer (path dependency during development; publishing this crate requires
   publishing `mtcs` first).

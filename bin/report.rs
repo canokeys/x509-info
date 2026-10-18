@@ -1,5 +1,5 @@
 use serde_json::Value;
-use x509_info::{CertificateInfo, DecodeDiagnostic, GeneralName, MtcProof, PublicKeyDetails};
+use x509_info::{CertificateInfo, DecodeDiagnostic, GeneralName, PublicKeyDetails};
 
 pub(crate) const VERSION: u32 = 2;
 
@@ -23,9 +23,27 @@ struct MtcSection {
     /// Serial number split into issuance log coordinates.
     entry_reference: Option<x509_info::MtcEntryReference>,
     /// Decoded MTCProof when structurally sound.
-    proof: Option<MtcProof>,
+    proof: Option<MtcProofSection>,
     /// Why the MTCProof could not be decoded, when applicable.
     proof_diagnostic: Option<DecodeDiagnostic>,
+}
+
+/// Report-side MTCProof projection: cosignatures gain a dotted ID presentation.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct MtcProofSection {
+    entry_extensions: Vec<x509_info::MtcEntryExtension>,
+    subtree_start: u64,
+    subtree_end: u64,
+    inclusion_proof: Vec<u8>,
+    cosignatures: Vec<MtcCosignatureSection>,
+}
+
+/// A cosignature with the cosigner's dotted trust anchor ID alongside the bytes.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct MtcCosignatureSection {
+    cosigner_id: Vec<u8>,
+    cosigner_id_dotted: Option<String>,
+    signature: Vec<u8>,
 }
 
 #[derive(serde::Serialize, schemars::JsonSchema)]
@@ -151,7 +169,30 @@ pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Va
     let mtc = info.mtc_proof().map(|proof| MtcSection {
         entry_reference: info.mtc_entry_reference(),
         proof_diagnostic: proof.as_ref().err().cloned(),
-        proof: proof.ok(),
+        proof: proof.ok().map(|proof| {
+            let x509_info::MtcProof {
+                entry_extensions,
+                subtree_start,
+                subtree_end,
+                inclusion_proof,
+                cosignatures,
+                ..
+            } = proof;
+            MtcProofSection {
+                entry_extensions,
+                subtree_start,
+                subtree_end,
+                inclusion_proof,
+                cosignatures: cosignatures
+                    .into_iter()
+                    .map(|c| MtcCosignatureSection {
+                        cosigner_id_dotted: c.cosigner_id_dotted(),
+                        cosigner_id: c.cosigner_id,
+                        signature: c.signature,
+                    })
+                    .collect(),
+            }
+        }),
     });
     let mut value = serde_json::to_value(Report {
         report_version: VERSION,

@@ -49,6 +49,20 @@ fn standalone_certificate_decodes_mtc_fields() {
             vec![0x81, 0xfd, 0x59, 0x02, 0x02],
         ]
     );
+    // The dotted presentation of the same IDs is available for display.
+    let dotted: Vec<_> = proof
+        .cosignatures
+        .iter()
+        .map(|c| c.cosigner_id_dotted())
+        .collect();
+    assert_eq!(
+        dotted,
+        [
+            Some("32473.1".to_string()),
+            Some("32473.2.1".to_string()),
+            Some("32473.2.2".to_string())
+        ]
+    );
     let sizes: Vec<usize> = proof
         .cosignatures
         .iter()
