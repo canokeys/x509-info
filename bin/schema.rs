@@ -1,10 +1,10 @@
 // Generate from Rust serialization types, then apply the CLI presentation rules.
 // No schema is inferred from sample certificates.
 use schemars::generate::{Contract, SchemaSettings};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 use crate::{
-    encoding::{field_rule, Aaguid, FieldFormat},
+    encoding::{Aaguid, FieldFormat, field_rule},
     report::{Report, VERSION},
 };
 
@@ -27,7 +27,9 @@ pub(crate) fn generate(summary: bool) -> crate::Result<Value> {
     let mode = if summary { "summary" } else { "full" };
     schema["$id"] = json!(format!("urn:x509-info:report:{VERSION}:{mode}"));
     schema["title"] = json!(format!("x509-info report v{VERSION} ({mode})"));
-    schema["description"] = json!("Textual report data model for JSON, JSON Lines and YAML. Describes parsed assertions and encodings, not certificate validity. TOML and binary format differences are documented in bin/README.md.");
+    schema["description"] = json!(
+        "Textual report data model for JSON, JSON Lines and YAML. Describes parsed assertions and encodings, not certificate validity. TOML and binary format differences are documented in bin/README.md."
+    );
     schema["properties"]["report_version"] = json!({"type":"integer", "const": VERSION});
     Ok(schema)
 }
@@ -95,12 +97,12 @@ fn adapt(schema: &mut Value, name: &Value, diagnostic: &Value, aaguid: &Value) {
             if kind.as_deref() == Some("fido_aaguid") {
                 properties.insert("value".into(), aaguid.clone());
             }
-            if let Some(uuid) = properties.get_mut("uuid") {
-                if uuid.get("type").and_then(Value::as_str) == Some("string") {
-                    // UUID formatting only: all-zero and nonstandard versions/variants are valid report strings.
-                    uuid["pattern"] =
-                        json!("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
-                }
+            if let Some(uuid) = properties.get_mut("uuid")
+                && uuid.get("type").and_then(Value::as_str) == Some("string")
+            {
+                // UUID formatting only: all-zero and nonstandard versions/variants are valid report strings.
+                uuid["pattern"] =
+                    json!("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
             }
             let enriched = matches!(
                 kind.as_deref(),

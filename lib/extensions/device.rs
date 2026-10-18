@@ -1,7 +1,7 @@
-use crate::{decoding, DecodeDiagnostic, ExtensionDetails as E, IntegerValue};
+use crate::{DecodeDiagnostic, ExtensionDetails as E, IntegerValue, decoding};
 use x509_cert::der::{
-    asn1::{BitString, BmpString, OctetString},
     Decode,
+    asn1::{BitString, BmpString, OctetString},
 };
 use x509_parser::asn1_rs::Tag;
 

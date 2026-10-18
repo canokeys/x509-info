@@ -1,6 +1,6 @@
 #![cfg(feature = "serde")]
 use serde::Serialize;
-use x509_info::{parse_pem, ParseOptions};
+use x509_info::{ParseOptions, parse_pem};
 
 #[test]
 fn cbor_preserves_the_json_data_model_including_unknown_and_optional_fields() {

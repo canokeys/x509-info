@@ -71,8 +71,8 @@ pub use extensions::{ExtensionDetails, ExtensionInfo, GeneralName, KeyPurpose, K
 pub use keys::public_key::PublicKeyDetails;
 pub use keys::{AlgorithmInfo, KeyDataStatus, ParameterStatus, PssParameters};
 pub use mtc::{
-    MtcCertificationAuthority, MtcCosignature, MtcEntryExtension, MtcEntryReference, MtcProof,
-    MTC_CA_SHA256_EXTENSION_OID, MTC_PROOF_ALGORITHM_OID, TRUST_ANCHOR_ID_ATTRIBUTE_OID,
+    MTC_CA_SHA256_EXTENSION_OID, MTC_PROOF_ALGORITHM_OID, MtcCertificationAuthority,
+    MtcCosignature, MtcEntryExtension, MtcEntryReference, MtcProof, TRUST_ANCHOR_ID_ATTRIBUTE_OID,
 };
 pub use names::details::NameDetails;
 pub use names::{DistinguishedName, NameAttribute};

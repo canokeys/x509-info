@@ -1,4 +1,4 @@
-use x509_cert::der::{asn1::OctetString, Decode};
+use x509_cert::der::{Decode, asn1::OctetString};
 
 /// One embedded SCT entry. No log lookup or signature verification is performed.
 #[derive(Clone, Debug, PartialEq, Eq)]

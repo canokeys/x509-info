@@ -1,4 +1,4 @@
-use crate::{extensions::general_name, GeneralName, OidNames};
+use crate::{GeneralName, OidNames, extensions::general_name};
 use x509_cert::{
     der::{Decode, Encode},
     ext::pkix,

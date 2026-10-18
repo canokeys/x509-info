@@ -1,5 +1,5 @@
 use crate::{
-    extensions::general_name, names::inspect_attribute, GeneralName, NameAttribute, OidNames,
+    GeneralName, NameAttribute, OidNames, extensions::general_name, names::inspect_attribute,
 };
 use x509_parser::extensions as backend;
 
@@ -85,7 +85,7 @@ pub(crate) fn access(
 pub(crate) fn distribution(bytes: &[u8], names: &OidNames) -> Option<Vec<DistributionPoint>> {
     use x509_cert::{
         der::{Decode, Encode},
-        ext::pkix::{name::DistributionPointName as B, CrlDistributionPoints},
+        ext::pkix::{CrlDistributionPoints, name::DistributionPointName as B},
     };
     use x509_parser::prelude::FromDer;
     let points = CrlDistributionPoints::from_der(bytes).ok()?;

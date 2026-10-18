@@ -134,9 +134,11 @@ fn invalid_inputs_and_options_fail_without_stdout() {
         assert!(output.stdout.is_empty());
         assert!(!output.stderr.is_empty());
     }
-    assert!(String::from_utf8(success(&["--help"], &[]))
-        .unwrap()
-        .contains("--input-format"));
+    assert!(
+        String::from_utf8(success(&["--help"], &[]))
+            .unwrap()
+            .contains("--input-format")
+    );
 }
 #[test]
 fn file_output_is_written_only_after_success() {
@@ -200,9 +202,11 @@ fn clap_validates_arguments_and_documents_formats() {
     ] {
         assert!(help.contains(format));
     }
-    assert!(String::from_utf8(success(&["--version"], &[]))
-        .unwrap()
-        .contains(env!("CARGO_PKG_VERSION")));
+    assert!(
+        String::from_utf8(success(&["--version"], &[]))
+            .unwrap()
+            .contains(env!("CARGO_PKG_VERSION"))
+    );
     assert_eq!(
         success(&["--format=der", "-"], PEM),
         success(&["-f", "der"], PEM)
@@ -212,8 +216,8 @@ fn clap_validates_arguments_and_documents_formats() {
 #[test]
 fn fido_uuid_and_unusual_lengths_survive_all_reports() {
     use x509_cert::der::{
-        asn1::{ObjectIdentifier, OctetString},
         Any, Decode, Encode, Tag, TagNumber,
+        asn1::{ObjectIdentifier, OctetString},
     };
     let info = x509_info::parse_pem(PEM, Default::default()).unwrap();
     let mut certificate = Vec::<Any>::from_der(&info.der).unwrap();

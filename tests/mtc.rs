@@ -4,7 +4,7 @@
 //! landmark fixture is entry 32 of log 1. No signature verification is tested;
 //! these assert decoding and retention only.
 
-use x509_info::{parse_pem, ExtensionDetails, ParseOptions};
+use x509_info::{ExtensionDetails, ParseOptions, parse_pem};
 
 const STANDALONE: &[u8] = include_bytes!("fixtures/mtc-standalone.pem");
 const LANDMARK: &[u8] = include_bytes!("fixtures/mtc-landmark.pem");

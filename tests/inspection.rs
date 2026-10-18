@@ -1,4 +1,4 @@
-use x509_info::{parse_der, parse_pem, Error, ParseOptions};
+use x509_info::{Error, ParseOptions, parse_der, parse_pem};
 
 const PEM: &[u8] = include_bytes!("fixtures/inspection.pem");
 
@@ -22,14 +22,16 @@ fn owns_fields_and_preserves_certificate_encodings() {
     assert_eq!(info.public_key.encoded_key_bits, 520);
     assert_eq!(info.public_key.key_bytes.len(), 65);
     assert!(info.public_key.spki_der.len() > info.public_key.key_bytes.len());
-    assert!(info
-        .extensions
-        .iter()
-        .any(|e| e.oid == "2.5.29.19" && e.critical));
-    assert!(info
-        .extensions
-        .iter()
-        .any(|e| e.oid == "2.5.29.17" && !e.critical));
+    assert!(
+        info.extensions
+            .iter()
+            .any(|e| e.oid == "2.5.29.19" && e.critical)
+    );
+    assert!(
+        info.extensions
+            .iter()
+            .any(|e| e.oid == "2.5.29.17" && !e.critical)
+    );
     assert_eq!(parse_der(&info.der, ParseOptions::default()).unwrap(), info);
     let period = info.validity;
     assert!(period.contains(period.not_before_unix));
@@ -112,13 +114,15 @@ fn enforces_encoded_input_budgets() {
             .unwrap_err(),
             Error::LimitExceeded
         );
-        assert!(parse(
-            bytes,
-            ParseOptions {
-                max_input_bytes: bytes.len()
-            }
-        )
-        .is_ok());
+        assert!(
+            parse(
+                bytes,
+                ParseOptions {
+                    max_input_bytes: bytes.len()
+                }
+            )
+            .is_ok()
+        );
     }
 }
 
@@ -369,11 +373,13 @@ fn summary_json_contract_matches_golden_without_raw_certificate_copies() {
         assert!(value.get(omitted).is_none());
     }
     assert!(value["public_key"].get("spki_der").is_none());
-    assert!(value["extensions"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|e| e.get("value_der").is_none()));
+    assert!(
+        value["extensions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e.get("value_der").is_none())
+    );
 }
 
 #[test]

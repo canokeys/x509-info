@@ -1,8 +1,8 @@
 use crate::{ExtensionDetails as E, OidNames};
 use x509_cert::{
     der::{
-        asn1::{Ia5String, Null},
         Decode, Encode,
+        asn1::{Ia5String, Null},
     },
     ext::pkix,
 };

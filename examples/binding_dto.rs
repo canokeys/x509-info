@@ -1,5 +1,5 @@
 //! Application-owned DTO mapping at a Rust/Dart boundary; no FRB dependency here.
-use x509_info::{parse_pem_with_names, ExtensionDetails, GeneralName, OidNames, ParseOptions};
+use x509_info::{ExtensionDetails, GeneralName, OidNames, ParseOptions, parse_pem_with_names};
 
 // In a Console binding crate, expose this application type through FRB.
 #[derive(Debug)]

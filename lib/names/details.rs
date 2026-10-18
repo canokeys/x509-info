@@ -1,5 +1,5 @@
-use crate::{decoding, DecodeDiagnostic, DecodeIssue, GeneralName};
-use x509_cert::der::{asn1::Any as DerAny, Decode, Encode, Tag as DerTag};
+use crate::{DecodeDiagnostic, DecodeIssue, GeneralName, decoding};
+use x509_cert::der::{Decode, Encode, Tag as DerTag, asn1::Any as DerAny};
 use x509_parser::asn1_rs::{Class, Tag};
 
 /// Additional fields decoded from a GeneralName's retained encoding.

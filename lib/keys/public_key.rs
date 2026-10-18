@@ -95,7 +95,7 @@ impl PublicKeyInfo {
                     return Err(DecodeDiagnostic::new(
                         DecodeIssue::UnsupportedEncoding,
                         "SEC1 point choice",
-                    ))
+                    ));
                 }
             },
             "1.3.101.110" | "1.3.101.111" => PublicKeyDetails::Montgomery(hex::encode(bytes)),

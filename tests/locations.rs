@@ -1,6 +1,6 @@
 use x509_info::{
-    parse_pem, parse_pem_with_names, DistributionPointName, ExtensionDetails as E, GeneralName,
-    OidNames, ParseOptions,
+    DistributionPointName, ExtensionDetails as E, GeneralName, OidNames, ParseOptions, parse_pem,
+    parse_pem_with_names,
 };
 const PEM: &[u8] = include_bytes!("fixtures/locations.pem");
 
@@ -170,7 +170,9 @@ fn policies_preserve_unknown_ids_cps_uris_and_unparsed_notices() {
         panic!("notice")
     };
     assert_eq!(notice.explicit_text.as_deref(), Some("Example notice"));
-    assert!(policies[1].qualifiers[1]
-        .value_der_hex
-        .contains("4578616d706c65206e6f74696365"));
+    assert!(
+        policies[1].qualifiers[1]
+            .value_der_hex
+            .contains("4578616d706c65206e6f74696365")
+    );
 }
