@@ -26,7 +26,7 @@ See the [ecosystem comparison](docs/x509-ecosystem.md) for alternatives and depe
 
 ## Library
 
-Requires Rust 1.85+.
+Requires Rust 1.88+.
 
 ```toml
 [dependencies]

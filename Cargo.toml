@@ -2,7 +2,7 @@
 name = "x509-info"
 version = "0.1.1"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 authors = ["canokeys.org"]
 license = "Apache-2.0"
 homepage = "https://github.com/canokeys/x509-info"
@@ -40,7 +40,7 @@ ciborium = { version = "0.2", optional = true }
 toml = { version = "0.8", optional = true }
 x509-cert = { version = "0.3", default-features = false }
 oid-registry = { version = "0.8", features = ["crypto", "x509", "x500"] }
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11.1", default-features = false }
 hex = "0.4"
 pkcs1 = { version = "0.7", default-features = false }
 x509-parser = { version = "0.18.1", default-features = false }
