@@ -26,7 +26,8 @@ See the [ecosystem comparison](docs/x509-ecosystem.md) for alternatives and depe
 
 ## Library
 
-Requires Rust 1.88+.
+Requires Rust 1.88+. If you are limited to Rust 1.85, stay on the 0.1.x line
+(without Merkle Tree Certificate support).
 
 ```toml
 [dependencies]
