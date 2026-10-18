@@ -20,7 +20,8 @@ or attestation policy. Callers own all inputs, results and OID overrides.
 | [`x509-parser`](https://crates.io/crates/x509-parser) | Borrowed certificate types and low-level parsing; used internally |
 | [`x509-cert`](https://crates.io/crates/x509-cert) | RustCrypto ASN.1 structures and certificate construction; nested decoders reused here |
 | [`x509-certificate-printer`](https://crates.io/crates/x509-certificate-printer) | Formatted certificate text |
-| **This crate: [`x509-info`](https://crates.io/crates/x509-info)** | Owned application data, field diagnostics, versioned reports and generated schemas |
+| [`mtcs`](https://crates.io/crates/mtcs) | Offline Merkle Tree Certificate verification; shares the MTC wire formats with this crate |
+| **This crate: [`x509-info`](https://crates.io/crates/x509-info)** | Owned application data, field diagnostics, versioned reports and generated schemas, with Merkle Tree Certificate awareness |
 
 See the [ecosystem comparison](docs/x509-ecosystem.md) for alternatives and dependency choices.
 
