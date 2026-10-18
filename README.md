@@ -31,7 +31,7 @@ Requires Rust 1.88+. If you are limited to Rust 1.85, stay on the 0.1.x line
 
 ```toml
 [dependencies]
-x509-info = { version = "0.1", features = ["serde"] }
+x509-info = { version = "0.2", features = ["serde"] }
 serde_json = "1"
 ```
 

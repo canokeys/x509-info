@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## 0.2.0
+
 - **MSRV is now Rust 1.88** (from 1.85), so the `mtcs` dependency can use the
   current RustCrypto generation (sha2 0.11, ctutils 0.4.3). The 0.1.x line
   remains available for Rust 1.85 users.
