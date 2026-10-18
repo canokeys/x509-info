@@ -1,5 +1,5 @@
 use serde_json::Value;
-use x509_info::{CertificateInfo, DecodeDiagnostic, GeneralName, PublicKeyDetails};
+use x509_info::{CertificateInfo, DecodeDiagnostic, GeneralName, MtcProof, PublicKeyDetails};
 
 pub(crate) const VERSION: u32 = 2;
 
@@ -13,6 +13,19 @@ pub(crate) struct Report<C> {
     directory_attribute_values: Vec<DirectoryValues>,
     extension_diagnostics: Vec<ExtensionDiagnostic>,
     policy_qualifier_diagnostics: Vec<QualifierDiagnostic>,
+    /// Present when the certificate's inner signature algorithm is id-alg-mtcProof.
+    mtc: Option<MtcSection>,
+}
+
+/// Merkle Tree Certificate fields, retained without inclusion/signature verification.
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct MtcSection {
+    /// Serial number split into issuance log coordinates.
+    entry_reference: Option<x509_info::MtcEntryReference>,
+    /// Decoded MTCProof when structurally sound.
+    proof: Option<MtcProof>,
+    /// Why the MTCProof could not be decoded, when applicable.
+    proof_diagnostic: Option<DecodeDiagnostic>,
 }
 
 #[derive(serde::Serialize, schemars::JsonSchema)]
@@ -135,6 +148,11 @@ pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Va
             _ => {}
         }
     }
+    let mtc = info.mtc_proof().map(|proof| MtcSection {
+        entry_reference: info.mtc_entry_reference(),
+        proof_diagnostic: proof.as_ref().err().cloned(),
+        proof: proof.ok(),
+    });
     let mut value = serde_json::to_value(Report {
         report_version: VERSION,
         certificate,
@@ -144,6 +162,7 @@ pub(crate) fn inspect(info: &CertificateInfo, summary: bool) -> crate::Result<Va
         directory_attribute_values,
         extension_diagnostics,
         policy_qualifier_diagnostics,
+        mtc,
     })?;
     enrich(&mut value)?;
     Ok(value)

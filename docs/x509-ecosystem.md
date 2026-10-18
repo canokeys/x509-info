@@ -20,6 +20,13 @@ ownership, validation scope and output contracts differ. `rcgen` is for creating
 certificates, while `rustls-pki-types` supplies shared PKI byte/time types; they
 are complementary rather than replacements.
 
+Separately, the crate shares Merkle Tree Certificate wire-format parsing with the
+`mtcs` crate (currently developed alongside this repository, not yet published):
+`mtcs` without its default `verify` feature is a dependency-free-of-cryptography
+base layer (proof and ID structures, serial split, CA extension), and this crate
+adds owned presentation types, OID labels and diagnostics over it. Publishing a
+new `x509-info` release therefore requires publishing `mtcs` first.
+
 ## Primary sources
 
 - [x509-parser API](https://docs.rs/x509-parser)

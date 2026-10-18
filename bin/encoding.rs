@@ -19,9 +19,17 @@ pub(crate) fn field_rule(
 ) -> Option<(String, FieldFormat)> {
     use FieldFormat::*;
     let (name, format) = match key {
-        "der" | "spki_der" | "parameters_der" | "key_bytes" | "signature_value" | "value_der" => {
-            (key, Octets)
-        }
+        "der"
+        | "spki_der"
+        | "parameters_der"
+        | "key_bytes"
+        | "signature_value"
+        | "value_der"
+        | "certificate_properties"
+        | "inclusion_proof"
+        | "cosigner_id"
+        | "extension_data"
+        | "signature" => (key, Octets),
         "serial_number" => ("serial_number_hex", Serial),
         "value_der_hex" | "encoded_hex" | "extensions_hex" | "signature_hex" | "raw_hex" => {
             (key.trim_end_matches("_hex"), Hex)

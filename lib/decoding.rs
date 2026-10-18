@@ -126,11 +126,21 @@ pub(crate) fn text(value: &Any<'_>) -> Result<String, DecodeDiagnostic> {
         Tag::BmpString => x509_cert::der::asn1::BmpString::from_ucs2(value.data)
             .map(|v| v.to_string())
             .map_err(|_| bad()),
+        Tag::RelativeOid => relative_oid(value.data).ok_or_else(bad),
         _ => Err(DecodeDiagnostic::new(
             DecodeIssue::UnsupportedEncoding,
             "string tag",
         )),
     }
+}
+
+/// Dotted-decimal RELATIVE-OID content octets are decoded through the shared
+/// `mtcs` trust-anchor-ID parser, capped at u128 arcs for presentation.
+/// Larger arcs are retained through the caller's raw value instead of erroring here.
+pub(crate) fn relative_oid(data: &[u8]) -> Option<String> {
+    mtcs::TrustAnchorId::from_binary(data)
+        .ok()
+        .map(|id| id.to_dotted())
 }
 
 pub(crate) fn der_error(error: x509_cert::der::Error, field: &str) -> DecodeDiagnostic {

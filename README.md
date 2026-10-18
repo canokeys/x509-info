@@ -44,9 +44,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 Inputs are limited to one certificate and 1 MiB by default; use `ParseOptions` to
-change the byte limit. The full result retains original bytes; `summary()` creates
-an owned view without large raw buffers. Public-key and name `details()` accessors
+change the byte limit. A certificate PEM may carry one CERTIFICATE PROPERTIES
+block (trust anchor ID metadata), retained raw as `certificate_properties`. The
+full result retains original bytes; `summary()` creates an owned view without
+large raw buffers. Public-key and name `details()` accessors
 provide additional decoded fields.
+
+Merkle Tree Certificates (draft-ietf-plants-merkle-tree-certs) are recognized:
+the issuer's trust anchor ID is decoded from its RELATIVE-OID attribute, the
+MTC CA extension is decoded, and `mtc_proof()` / `mtc_entry_reference()` expose
+the MTCProof wire structure and the (log number, entry index) serial split.
+Proofs and cosignatures are decoded, never verified.
 
 | Feature | Adds |
 | --- | --- |

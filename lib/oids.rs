@@ -158,6 +158,10 @@ const LABELS: &[(&str, &str)] = &[
     ("1.3.6.1.5.5.7.48.1", "ocsp"),
     ("1.3.6.1.5.5.7.48.2", "ca_issuers"),
     ("1.3.6.1.5.5.7.48.5", "ca_repository"),
+    ("1.3.6.1.5.5.7.6.36", "unsigned"),
+    ("1.3.6.1.5.5.7.6.67", "MTC-Proof"),
+    ("1.3.6.1.5.5.7.25.3", "trustAnchorID"),
+    ("1.3.6.1.5.5.7.1.38", "mtc_certification_authority_sha256"),
 ];
 
 #[cfg(test)]

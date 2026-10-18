@@ -13,7 +13,8 @@ pub struct NameAttribute {
     pub oid: String,
     /// Common attribute label, when recognized (for example CN or O).
     pub label: Option<String>,
-    /// Decoded UTF-8/Printable/Numeric/IA5/Visible/BMP/Universal text, or None.
+    /// Decoded UTF-8/Printable/Numeric/IA5/Visible/BMP/Universal text or
+    /// dotted-decimal RELATIVE-OID (used by trust anchor ID attributes), or None.
     /// No lossy decoding is used. Raw value content remains available in value_hex.
     pub value: Option<String>,
     /// ASN.1 tag number of the value; the complete Name DER preserves its header.

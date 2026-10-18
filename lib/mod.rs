@@ -46,6 +46,7 @@
 mod decoding;
 mod extensions;
 mod keys;
+mod mtc;
 mod names;
 mod oids;
 mod summary;
@@ -69,6 +70,10 @@ pub use extensions::transparency::{SctEntry, SignedCertificateTimestamp};
 pub use extensions::{ExtensionDetails, ExtensionInfo, GeneralName, KeyPurpose, KeyUsage};
 pub use keys::public_key::PublicKeyDetails;
 pub use keys::{AlgorithmInfo, KeyDataStatus, ParameterStatus, PssParameters};
+pub use mtc::{
+    MtcCertificationAuthority, MtcCosignature, MtcEntryExtension, MtcEntryReference, MtcProof,
+    MTC_CA_SHA256_EXTENSION_OID, MTC_PROOF_ALGORITHM_OID, TRUST_ANCHOR_ID_ATTRIBUTE_OID,
+};
 pub use names::details::NameDetails;
 pub use names::{DistinguishedName, NameAttribute};
 pub use oids::{InvalidOid, OidNames};
@@ -112,10 +117,10 @@ pub enum Error {
     /// Encoded input or decoded DER exceeds the caller's budget.
     #[error("certificate input limit exceeded")]
     LimitExceeded,
-    /// PEM armor/base64 is invalid, or input contains extra text/blocks.
+    /// PEM armor/base64 is invalid, a block kind repeats, or input contains extra text.
     #[error("invalid certificate PEM")]
     InvalidPem,
-    /// The PEM label is not CERTIFICATE.
+    /// A block label other than CERTIFICATE / CERTIFICATE PROPERTIES was found.
     #[error("expected a CERTIFICATE PEM block")]
     UnexpectedPemLabel,
     /// Input could not be decoded as an X.509 certificate.
@@ -203,6 +208,11 @@ pub struct CertificateInfo {
     pub signature_value: Vec<u8>,
     /// Number of unused bits in the final signature byte.
     pub signature_unused_bits: u8,
+    /// Associated CERTIFICATE PROPERTIES block (trust anchor ID metadata) when the
+    /// input PEM carried one; None for DER input. Its contents are retained raw;
+    /// decoding the CertificatePropertyList is left to the caller.
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub certificate_properties: Option<Vec<u8>>,
     /// Encoded public-key information and any recognized key size.
     pub public_key: PublicKeyInfo,
     /// Extensions in encoded order, with common decoded values; no policy is enforced.
@@ -311,6 +321,7 @@ pub fn parse_der_with_names(
         serial_number: cert.raw_serial().to_vec(),
         signature_value: cert.signature_value.data.to_vec(),
         signature_unused_bits: cert.signature_value.unused_bits,
+        certificate_properties: None,
         public_key: PublicKeyInfo {
             algorithm: keys::inspect(&spki.algorithm, false, names)?,
             curve_name: curve_oid
@@ -342,15 +353,57 @@ pub fn parse_der_with_names(
     })
 }
 
-/// Inspect one CERTIFICATE PEM block, permitting only surrounding ASCII whitespace.
-///
-/// Input is bounded before base64 decoding. Bundles, unrelated labels, and text
-/// before/after the block are rejected rather than silently selecting one entry.
-/// Decoded DER is checked with [`parse_der`]. No file or system I/O occurs.
+/// Locate the first occurrence of `needle` in `haystack`.
+fn find_subsequence(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.len() > haystack.len() {
+        return None;
+    }
+    haystack.windows(needle.len()).position(|w| w == needle)
+}
+
+/// Split a PEM document into (label, DER) blocks. Base64 armor never contains
+/// '-', so END markers can be located textually before strict per-block decoding.
+fn pem_blocks(input: &[u8]) -> Result<Vec<(String, Vec<u8>)>, Error> {
+    const BEGIN: &[u8] = b"-----BEGIN ";
+    let mut blocks = Vec::new();
+    let mut rest = input;
+    while !rest.trim_ascii_start().is_empty() {
+        rest = rest.trim_ascii_start();
+        let block_start = rest;
+        let after_begin = rest.strip_prefix(BEGIN).ok_or(Error::InvalidPem)?;
+        let label_len = after_begin
+            .iter()
+            .position(|b| *b == b'-')
+            .ok_or(Error::InvalidPem)?;
+        let label = &after_begin[..label_len];
+        if label.is_empty() || !after_begin[label_len..].starts_with(b"-----") {
+            return Err(Error::InvalidPem);
+        }
+        let mut marker = Vec::with_capacity(label.len() + 14);
+        marker.extend_from_slice(b"-----END ");
+        marker.extend_from_slice(label);
+        marker.extend_from_slice(b"-----");
+        let end = find_subsequence(after_begin, &marker).ok_or(Error::InvalidPem)?;
+        let block_len = BEGIN.len() + end + marker.len();
+        // RFC 7468 decoding validates matching boundaries and full consumption.
+        let (label, der) =
+            pem_rfc7468::decode_vec(&block_start[..block_len]).map_err(|_| Error::InvalidPem)?;
+        blocks.push((label.to_owned(), der));
+        rest = &block_start[block_len..];
+    }
+    Ok(blocks)
+}
+
+/// Inspect exactly one CERTIFICATE PEM block, optionally accompanied by one
+/// CERTIFICATE PROPERTIES block (draft-ietf-tls-trust-anchor-ids metadata).
+/// Only surrounding ASCII whitespace is permitted around blocks. Bundles of
+/// certificates, unrelated labels, and duplicate blocks are rejected rather
+/// than silently selecting one entry. Decoded DER is checked with [`parse_der`].
+/// No file or system I/O occurs.
 ///
 /// # Errors
 /// Returns InvalidOptions/LimitExceeded for budgets, InvalidPem for invalid armor,
-/// UnexpectedPemLabel for another block type, InvalidPem for extra PEM blocks/data,
+/// repeated block kinds or empty input, UnexpectedPemLabel for other block types,
 /// or an error from [`parse_der`] for the decoded certificate.
 pub fn parse_pem(bytes: &[u8], options: ParseOptions) -> Result<CertificateInfo, Error> {
     check_limit(bytes, options)?;
@@ -368,12 +421,24 @@ pub fn parse_pem_with_names(
     names: &OidNames,
 ) -> Result<CertificateInfo, Error> {
     check_limit(bytes, options)?;
-    let trimmed = bytes.trim_ascii();
-    // RFC 7468 decoding validates matching boundaries and full consumption.
-    // Unlike Console's former PEM helper, no extra block/text is silently ignored.
-    let (label, der) = pem_rfc7468::decode_vec(trimmed).map_err(|_| Error::InvalidPem)?;
-    if label != "CERTIFICATE" {
-        return Err(Error::UnexpectedPemLabel);
+    let blocks = pem_blocks(bytes.trim_ascii())?;
+    if blocks.is_empty() {
+        return Err(Error::InvalidPem);
     }
-    parse_der_with_names(&der, options, names)
+    let mut certificate = None;
+    let mut properties = None;
+    for (label, der) in blocks {
+        match label.as_str() {
+            "CERTIFICATE" if certificate.is_none() => certificate = Some(der),
+            "CERTIFICATE PROPERTIES" if properties.is_none() => properties = Some(der),
+            // Duplicating a recognized block kind would make consumers guess.
+            "CERTIFICATE" | "CERTIFICATE PROPERTIES" => return Err(Error::InvalidPem),
+            _ => return Err(Error::UnexpectedPemLabel),
+        }
+    }
+    // Retains the single-certificate error for a lone non-certificate block.
+    let der = certificate.ok_or(Error::UnexpectedPemLabel)?;
+    let mut info = parse_der_with_names(&der, options, names)?;
+    info.certificate_properties = properties;
+    Ok(info)
 }

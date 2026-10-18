@@ -182,6 +182,9 @@ pub enum ExtensionDetails {
     MicrosoftTemplateName(String),
     /// Microsoft certificate-template OID and optional version INTEGERs.
     MicrosoftCertificateTemplate(crate::CertificateTemplate),
+    /// Merkle Tree CA parameters from id-pe-mtcCertificationAuthority-SHA256.
+    /// The CA cosigner signature algorithm is identified, not used for verification.
+    MtcCertificationAuthority(crate::MtcCertificationAuthority),
     /// This library does not interpret this OID. Raw bytes remain available.
     Unsupported,
     /// A supported extension could not be decoded within this library's limits.

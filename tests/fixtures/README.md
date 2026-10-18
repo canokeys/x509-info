@@ -41,3 +41,12 @@ that otherwise reports that field as absent.
 `policies.pem` (50), generated the same way, includes anyPolicy plus a private
 policy with CPS URI and UserNotice. The notice is decoded into organization/numbers/text while its complete raw value
 remains available; tests cover both representations.
+
+`mtc-standalone.pem`, `mtc-landmark.pem` and `mtc-ca.pem` are Merkle Tree
+Certificate fixtures produced by the IETF PLANTS WG demo
+(ietf-plants-wg/merkle-tree-certs, demo/mtc.json, "plants-07" wire version) with
+a throwaway CA (ID 32473.1) and cosigner keys. They are not trust anchors; the
+certificates assert names under example.test-style b.example hosts. The
+certificates carry an additional CERTIFICATE PROPERTIES block, exercising
+multi-block PEM parsing. Tests assert decoding only; no signature verification
+or network access occurs.

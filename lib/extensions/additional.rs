@@ -204,6 +204,7 @@ pub(crate) fn decode(oid: &str, bytes: &[u8], names: &OidNames) -> Option<E> {
         "1.3.6.1.4.1.11129.2.4.2" => {
             E::SignedCertificateTimestamps(crate::extensions::transparency::decode(bytes)?)
         }
+        "1.3.6.1.5.5.7.1.38" => crate::mtc::decode_ca_extension(bytes, names)?,
         _ => E::Unsupported,
     })
 }
