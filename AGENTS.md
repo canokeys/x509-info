@@ -5,7 +5,7 @@
 - Callers own inputs, results and OID overrides. Do not add mutable globals, handle registries, clocks, randomness, transports or async runtimes to the library.
 - Parse fields and encodings without enforcing validity, trust, signatures, identity or attestation policy. Preserve unknown and malformed data with typed diagnostics.
 - Reuse maintained parsing and cryptography libraries. Preserve Rust 1.88 compatibility and the default/serde/schema/cli feature boundaries.
-- MTC wire formats come from the sibling `mtcs` crate (its no-cryptography base layer, `default-features = false`). Do not enable `mtcs/verify` here: verification and cosignature cryptography are out of this crate's scope. Keep `mtcs` itself Rust 1.88-compatible.
+- MTC wire formats come from the `mtcs` crate (its no-cryptography base layer, `default-features = false`). Do not enable `mtcs/verify` here: verification and cosignature cryptography are out of this crate's scope. Keep `mtcs` itself Rust 1.88-compatible.
 - Keep deny(missing_docs), document public ownership and encoding contracts, and avoid exposing backend borrowing through owned results.
 - Library summary and CLI report versions are separate contracts. Preserve existing representations; incompatible changes require a version bump. Generate CLI schemas from source types and shared formatting rules.
 - Before Rust commits, run fmt, default/all-feature tests including doctests, strict all-target clippy and rustdoc with warnings denied. Run dependency, schema, wasm and package checks when affected. Test meaningful malformed-input and representation cases.

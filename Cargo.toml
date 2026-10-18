@@ -47,7 +47,7 @@ x509-parser = { version = "0.18.1", default-features = false }
 pem-rfc7468 = { version = "1", default-features = false, features = ["alloc"] }
 thiserror = "2"
 serde = { version = "1", features = ["derive"], optional = true }
-mtcs = { version = "0.1.0", path = "../mtcs", default-features = false }
+mtcs = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 serde_json = "1"

@@ -19,8 +19,7 @@
   and its dotted presentation, and `MtcCosignature::cosigner_id_dotted` exposes it
   in the library.
 - MTC wire-format parsing is delegated to the `mtcs` crate's no-cryptography base
-  layer (path dependency during development; publishing this crate requires
-  publishing `mtcs` first).
+  layer (published on crates.io as of mtcs 0.1.0).
 
 ## 0.1.1
 
