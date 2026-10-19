@@ -410,9 +410,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "mtcs"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5ed8931ed11d59551b0120f83b0a7be556bb1466937bb72e43ec6c3839b6f82"
+checksum = "8d0ae3e940fdb64ebf483794adb99de43666441ca434924de35a0a242dd75857"
 dependencies = [
  "sha2",
  "thiserror",

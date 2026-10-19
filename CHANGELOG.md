@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Updated the `mtcs` dependency to 0.2; no user-visible changes (the MTC
+  wire-format base layer is unchanged, and `mtcs` types are not part of this
+  crate's public API).
+
 ## 0.2.0
 
 - **MSRV is now Rust 1.88** (from 1.85), so the `mtcs` dependency can use the
